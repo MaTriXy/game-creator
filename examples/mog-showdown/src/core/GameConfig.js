@@ -3,6 +3,7 @@ import { GAME, COLORS, DPR } from './Constants.js';
 import { BootScene } from '../scenes/BootScene.js';
 import { GameScene } from '../scenes/GameScene.js';
 import { GameOverScene } from '../scenes/GameOverScene.js';
+import { UIScene } from '../scenes/UIScene.js';
 
 export const GameConfig = {
   type: Phaser.AUTO,
@@ -27,5 +28,5 @@ export const GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, GameScene, GameOverScene],
+  scene: [BootScene, GameScene, GameOverScene, UIScene],
 };

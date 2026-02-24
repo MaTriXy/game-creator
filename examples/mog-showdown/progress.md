@@ -92,6 +92,53 @@
 9. **Character Prominence**: 5/5 — Photo-composite bobbleheads, player trail, expression reactions
 10. **First Impression / Viral Appeal**: 5/5 — First 3 seconds have flash, bounce-in, shake, particles, flavor text; zero static frames
 
+## Step 3: Audio
+
+### New Files
+- `src/audio/AudioManager.js` -- Wraps Strudel `initStrudel()`, `hush()`, `.play()` for BGM. Tracks initialized state, current pattern, and last pattern function for mute/unmute resume. Methods: `init()`, `playMusic(fn)`, `stopMusic()`, `muteStop()`, `resumeMusic()`.
+- `src/audio/music.js` -- Three BGM patterns using Strudel `stack()` + `.play()` with synth oscillators only (no sample names):
+  - **gameplayBGM** (135 cpm): Aggressive sawtooth lead (4 alternating riffs), synth kick (2 patterns), synth snare, triangle bass (3 progressions), square stab arp (phased at 1.5x), hi-hat texture (probabilistic, phased at 3x). ~12 cycles before exact repetition.
+  - **gameOverWinBGM** (100 cpm): Triumphant square melody (3 phrases), major pad chords (sine, slow 2x), grounding bass, shimmer accents (probabilistic, slow 3x).
+  - **gameOverLoseBGM** (60 cpm): Descending triangle melody (3 variations), dark minor pad (sine, slow 2x), ghostly probabilistic texture (slow 3x).
+- `src/audio/sfx.js` -- Web Audio API one-shot sound effects (never Strudel):
+  - `powerupCollectSfx()`: Bright ascending 5-note chime (C5-E5-G5-B5-C6)
+  - `attackHitSfx()`: Low sine thud (55Hz) + noise burst impact
+  - `frameMogSfx()`: Rising sawtooth sweep (C3->C5) + triumphant chord + noise whoosh
+  - `comboSfx()`: Quick punchy square blip (G5)
+  - `lifeLostSfx()`: Descending 3-note minor phrase (A4-F4-C4)
+  - `gameOverSfx()`: Heavy descending tones (G4->D3) + noise burst
+- `src/audio/AudioBridge.js` -- Wires EventBus events to audio:
+  - `AUDIO_INIT` -> `audioManager.init()`
+  - `GAME_START` -> `MUSIC_GAMEPLAY` -> gameplay BGM
+  - `POWERUP_COLLECTED` -> `powerupCollectSfx()`
+  - `ATTACK_HIT` -> `attackHitSfx()`
+  - `MOG_FRAMEMOG` -> `frameMogSfx()`
+  - `SPECTACLE_COMBO` -> `comboSfx()`
+  - `LIFE_LOST` -> `lifeLostSfx()`
+  - `GAME_OVER` -> stop BGM + `gameOverSfx()` + 800ms delay + game-over BGM (win/lose based on score > 20)
+  - `GAME_RESTART` -> `stopMusic()` (full stop, clears pattern)
+  - `AUDIO_TOGGLE_MUTE` -> toggle `gameState.isMuted`, persist to localStorage, muteStop/resumeMusic
+- `src/scenes/UIScene.js` -- Parallel overlay scene with mute button:
+  - Speaker icon drawn with Phaser Graphics (body + cone + wave arcs / X mark when muted)
+  - Bottom-right corner, semi-transparent hit zone (large enough for mobile touch)
+  - Click/tap toggles mute via `AUDIO_TOGGLE_MUTE`
+  - M key shortcut
+  - Visible in both GameScene and GameOverScene (runs as parallel scene)
+
+### Modified Files
+- `src/main.js` -- Imports and calls `initAudioBridge()` before game creation. Adds first-interaction handler (pointerdown/keydown) that emits `AUDIO_INIT` + `GAME_START` once.
+- `src/core/GameConfig.js` -- Added UIScene to scene list.
+- `src/scenes/BootScene.js` -- Launches UIScene in parallel on create.
+- `src/scenes/GameScene.js` -- Emits `GAME_START` in `create()` for restart BGM wiring.
+
+### Architecture Notes
+- BGM uses Strudel (`@strudel/web`) -- patterns loop via `.play()`, stopped with `hush()`. 100ms delay between hush and new play.
+- SFX uses Web Audio API directly -- one-shot oscillators + gain + filter. `hush()` never kills SFX.
+- All SFX check `gameState.isMuted` before playing.
+- `gameState.isMuted` initialized from localStorage, persisted on toggle, not reset by `gameState.reset()`.
+- Audio events already existed in EventBus from scaffold step (AUDIO_INIT, MUSIC_GAMEPLAY, MUSIC_GAMEOVER, MUSIC_STOP, AUDIO_TOGGLE_MUTE).
+- Anti-repetition: 4-phrase cycle alternation on leads, 3-phrase on bass, probabilistic notes (`?`), filter cycling (`<...>`), layer phasing with different `.slow()` values. Effective loop > 30 seconds.
+
 ## Decisions / Known Issues
 - Gravity set to 0 — projectiles use custom velocity for falling
 - No title screen — boots directly into gameplay

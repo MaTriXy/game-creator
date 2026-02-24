@@ -2,8 +2,26 @@ import Phaser from 'phaser';
 import { GameConfig } from './core/GameConfig.js';
 import { eventBus, Events } from './core/EventBus.js';
 import { gameState } from './core/GameState.js';
+import { initAudioBridge } from './audio/AudioBridge.js';
+
+// Wire audio EventBus listeners before game starts
+initAudioBridge();
 
 const game = new Phaser.Game(GameConfig);
+
+// --- Audio init on first user interaction (browser autoplay policy) ---
+let audioInitDone = false;
+function onFirstInteraction() {
+  if (audioInitDone) return;
+  audioInitDone = true;
+  eventBus.emit(Events.AUDIO_INIT);
+  // Start gameplay BGM after init (game boots directly into gameplay)
+  eventBus.emit(Events.GAME_START);
+  document.removeEventListener('pointerdown', onFirstInteraction);
+  document.removeEventListener('keydown', onFirstInteraction);
+}
+document.addEventListener('pointerdown', onFirstInteraction);
+document.addEventListener('keydown', onFirstInteraction);
 
 // Expose for Playwright testing
 window.__GAME__ = game;

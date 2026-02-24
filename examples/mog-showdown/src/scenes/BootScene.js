@@ -19,5 +19,7 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     this.scene.start('GameScene');
+    // Launch UIScene in parallel (mute button visible across all scenes)
+    this.scene.launch('UIScene');
   }
 }

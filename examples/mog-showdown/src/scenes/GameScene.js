@@ -123,6 +123,9 @@ export class GameScene extends Phaser.Scene {
     this.playEntranceSequence();
 
     gameState.started = true;
+
+    // --- Audio: start gameplay BGM (first play handled by main.js, restarts handled here) ---
+    eventBus.emit(Events.GAME_START);
   }
 
   drawArenaBackground() {
