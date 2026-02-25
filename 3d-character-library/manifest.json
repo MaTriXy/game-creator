@@ -1,0 +1,40 @@
+{
+  "characters": [
+    {
+      "name": "Soldier",
+      "file": "models/Soldier.glb",
+      "scale": 1,
+      "facingOffset": 3.141592653589793,
+      "clipMap": { "idle": "Idle", "walk": "Walk", "run": "Run" },
+      "license": "MIT",
+      "source": "three.js repo"
+    },
+    {
+      "name": "Xbot",
+      "file": "models/Xbot.glb",
+      "scale": 1,
+      "facingOffset": 0,
+      "clipMap": { "idle": "idle", "walk": "walk", "run": "run" },
+      "license": "MIT",
+      "source": "three.js repo"
+    },
+    {
+      "name": "Robot",
+      "file": "models/RobotExpressive.glb",
+      "scale": 1,
+      "facingOffset": 0,
+      "clipMap": { "idle": "Idle", "walk": "Walking", "run": "Running" },
+      "license": "MIT",
+      "source": "three.js repo"
+    },
+    {
+      "name": "Fox",
+      "file": "models/Fox.glb",
+      "scale": 0.02,
+      "facingOffset": 0,
+      "clipMap": { "idle": "Survey", "walk": "Walk", "run": "Run" },
+      "license": "CC0 / CC-BY 4.0",
+      "source": "KhronosGroup glTF-Sample-Assets"
+    }
+  ]
+}
