@@ -6,22 +6,35 @@ user-invocable: false
 
 # Game 3D Asset Engineer (Model Pipeline)
 
-You are an expert 3D game artist and integrator. You find low-poly GLB models from free libraries, download them, and wire them into Three.js games — replacing primitive geometry with recognizable 3D models.
+You are an expert 3D game artist and integrator. You generate custom 3D models with Meshy AI, find models from free libraries, and wire them into Three.js games — replacing primitive geometry with recognizable 3D models.
 
 ## Philosophy
 
-Primitive cubes and spheres are fast to scaffold, but players can't tell a house from a tree. Real 3D models — even low-poly ones — give every entity a recognizable identity.
+Primitive cubes and spheres are fast to scaffold, but players can't tell a house from a tree. Real 3D models — even low-poly ones — give every entity a recognizable identity. **Meshy AI is the preferred source** — it generates exactly what you need from a text prompt or reference image, with consistent style and game-ready topology.
 
 ### Asset Tiers
 
 | Tier | Source | Auth | Best for |
 |------|--------|------|----------|
-| **1. Three.js repo models** | github.com/mrdoob/three.js | None (curl) | Animated characters (Soldier, Xbot, Robot, Fox) |
-| **2. Sketchfab** | sketchfab.com | `SKETCHFAB_TOKEN` for download | Huge catalog, varied quality |
-| **3. Poly Haven** | polyhaven.com | None | ~400 CC0 environment props |
-| **4. Poly.pizza** | poly.pizza | `POLY_PIZZA_API_KEY` | 10K+ low-poly CC-BY models |
-| **5. Meshy AI** (generation) | meshy.ai | `MESHY_API_KEY` | Custom models from text/image, auto-rig, animate |
-| **6. Procedural geometry** (fallback) | Code | N/A | BoxGeometry/SphereGeometry |
+| **1. Meshy AI** (preferred) | meshy.ai | `MESHY_API_KEY` | Custom characters, props, and scenery from text/image — exact match to game theme |
+| **2. Pre-built character library** | `3d-character-library/` | None | Quick animated humanoids (Soldier, Xbot, Robot, Fox) when Meshy key unavailable |
+| **3. Sketchfab** | sketchfab.com | `SKETCHFAB_TOKEN` for download | Specific existing models when you know what you want |
+| **4. Poly Haven** | polyhaven.com | None | CC0 environment props |
+| **5. Poly.pizza** | poly.pizza | `POLY_PIZZA_API_KEY` | 10K+ low-poly CC-BY models |
+| **6. Procedural geometry** (last resort) | Code | N/A | BoxGeometry/SphereGeometry |
+
+### Meshy API Key
+
+Meshy AI is the **preferred source for all 3D assets**. If `MESHY_API_KEY` is not set, **ask the user before falling back to other tiers**:
+
+> I'd like to generate custom 3D models with Meshy AI for the best results. You can get a free API key:
+> 1. Sign up at https://app.meshy.ai
+> 2. Go to Settings → API Keys
+> 3. Create a new API key
+>
+> What is your Meshy API key? (Or type "skip" to use free model libraries instead)
+
+If the user provides a key, use it for all `meshy-generate.mjs` calls. If they skip, fall through to Tier 2+.
 
 ### Pre-built Animated Characters (No Auth, Direct Download)
 
@@ -83,31 +96,32 @@ curl -L -o public/assets/models/Soldier.glb "https://raw.githubusercontent.com/m
 
 ## Character Selection — Tiered Fallback
 
-When a game features named personalities (Trump, Biden, Musk, etc.), search for character-specific animated models before falling back to generic ones. For EACH character:
+For EACH character in the game, try these tiers in order:
 
-**Tier 1 — Pre-built in `3d-character-library/`**: Check `manifest.json` for a name/theme match. Copy the GLB. Done.
-
-**Tier 2 — Search Sketchfab for character-specific model**: Use `find-3d-asset.mjs` to search for an animated model matching the character:
+**Tier 1 — Generate with Meshy AI** (preferred): Generate a custom character model matching the game's art direction. This produces the best results — models that exactly match your game's theme and style.
 ```bash
-# Search by name
-node scripts/find-3d-asset.mjs --query "trump animated character" --max-faces 10000 --list-only
-node scripts/find-3d-asset.mjs --query "biden animated walk" --max-faces 10000 --list-only
+# Generate character from text description
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode text-to-3d \
+  --prompt "a stylized <character description>, low poly game character, full body, t-pose" \
+  --polycount 15000 --pbr \
+  --output public/assets/models/ --slug <character-slug>
 
-# Download if SKETCHFAB_TOKEN is set
-SKETCHFAB_TOKEN=<token> node scripts/find-3d-asset.mjs \
-  --query "trump animated character" --max-faces 10000 \
-  --output public/assets/models/ --slug trump
+# Then rig for animation (humanoid characters)
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode rig --task-id <refine-task-id> \
+  --height 1.7 \
+  --output public/assets/models/ --slug <character-slug>-rigged
 ```
-After download, log clip names to build the `clipMap`. If it has idle+walk, it's ready.
+After rigging, the model comes with basic walk/run animations. Log clip names to build the `clipMap`.
 
-**Tier 3 — Search by archetype**: If no character-specific model exists, search by what the character looks like:
+For named personalities, be descriptive: `"a cartoon caricature of <Name>, <hair/glasses/suit details>, low poly game character"`.
+
+**Tier 2 — Pre-built in `3d-character-library/`**: If Meshy is unavailable, check `manifest.json` for a name/theme match. Copy the GLB. Done.
+
+**Tier 3 — Search Sketchfab for character-specific model**: Use `find-3d-asset.mjs`:
 ```bash
-# Politicians / business people
-node scripts/find-3d-asset.mjs --query "suit man animated walk idle" --max-faces 10000 --list-only
-
-# Athletes → "athlete animated"
-# Scientists → "lab coat animated"
-# Animals → search by species
+node scripts/find-3d-asset.mjs --query "<character name> animated character" --max-faces 10000 --list-only
 ```
 
 **Tier 4 — Generic library fallback**: Use the best thematic match from `3d-character-library/`:
@@ -116,11 +130,11 @@ node scripts/find-3d-asset.mjs --query "suit man animated walk idle" --max-faces
 - **RobotExpressive** — cartoon/casual (most animations, 13 clips)
 - **Fox** — nature/animal
 
-**Multi-character games**: When 2+ characters use the same base model, assign different library models to each (e.g., Soldier for Trump, Xbot for Biden) so players can tell them apart. Note material recoloring opportunities in `MODEL_CONFIG`.
+**Multi-character games**: When using Meshy, generate each character with distinct descriptions for visual variety. When falling back to library models, assign different models to each character (e.g., Soldier for one, Xbot for another).
 
-## Sketchfab Token
+## Sketchfab Token (Tier 3 fallback)
 
-Sketchfab search is free but **download requires `SKETCHFAB_TOKEN`**. If the token is not set when a Sketchfab download is needed, **ask the user**:
+Only needed if falling back to Sketchfab. Search is free but **download requires `SKETCHFAB_TOKEN`**. If needed and not set, ask the user:
 
 > I need a Sketchfab API token to download this model. You can get one for free:
 > 1. Sign in at https://sketchfab.com
@@ -130,14 +144,6 @@ Sketchfab search is free but **download requires `SKETCHFAB_TOKEN`**. If the tok
 > What is your Sketchfab API token?
 
 Then pass it as: `SKETCHFAB_TOKEN=<token> node scripts/find-3d-asset.mjs ...`
-
-For direct Sketchfab downloads by model UID (when you know the exact model):
-```bash
-SKETCHFAB_TOKEN=<token> curl -s -H "Authorization: Token <token>" \
-  "https://api.sketchfab.com/v3/models/<uid>/download" | \
-  python3 -c "import json,sys; print(json.load(sys.stdin)['glb']['url'])"
-# Then curl -L -o model.glb "<url>"
-```
 
 ## Search & Download Script
 
@@ -303,6 +309,10 @@ if (mixer) mixer.update(delta);
 
 ## Process
 
+### Step 0: Check Meshy API Key
+
+Before starting, check if `MESHY_API_KEY` is available. If not, ask the user for one (see "Meshy API Key" section above). If the user skips, proceed with Tier 2+ fallbacks.
+
 ### Step 1: Audit
 
 - Read `package.json` to confirm Three.js
@@ -313,18 +323,39 @@ if (mixer) mixer.update(delta);
 
 | Entity | Model Source | Type | Notes |
 |--------|------------|------|-------|
-| Player | Soldier.glb (three.js repo) | Animated character | Idle/Walk/Run |
-| Enemy | RobotExpressive.glb (three.js repo) | Animated character | 13 clips |
-| Tree | find-3d-asset.mjs search | Static prop | Scenery |
-| Barrel | find-3d-asset.mjs search | Static prop | Obstacle |
+| Player | Meshy text-to-3d → rig | Animated character | Custom generated + rigged |
+| Enemy | Meshy text-to-3d → rig | Animated character | Custom generated + rigged |
+| Tree | Meshy text-to-3d | Static prop | "a low poly stylized tree, game asset" |
+| Barrel | Meshy text-to-3d | Static prop | "a wooden barrel, low poly game asset" |
 
-### Step 3: Download
+If Meshy unavailable, fall back to library characters + `find-3d-asset.mjs` for props.
+
+### Step 3: Generate / Download
 
 ```bash
-# Animated characters — direct curl from three.js repo
-curl -L -o public/assets/models/Soldier.glb "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb"
+# With Meshy (preferred) — generate each entity
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode text-to-3d \
+  --prompt "a heroic knight, low poly game character, full body" \
+  --polycount 15000 --pbr \
+  --output public/assets/models/ --slug player
 
-# Static props — use find-3d-asset.mjs
+# Rig humanoid characters for animation
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode rig --task-id <refine-task-id> --height 1.7 \
+  --output public/assets/models/ --slug player-rigged
+
+# Generate static props
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode text-to-3d \
+  --prompt "a wooden barrel, low poly game asset" \
+  --polycount 5000 \
+  --output public/assets/models/ --slug barrel
+
+# Fallback: library characters
+cp <plugin-root>/3d-character-library/models/Soldier.glb public/assets/models/
+
+# Fallback: search free libraries for props
 node scripts/find-3d-asset.mjs --query "barrel" --source polyhaven --output public/assets/models/
 ```
 

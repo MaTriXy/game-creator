@@ -213,12 +213,12 @@ If celebrities are detected:
 - Set `hasCelebrities = true` and list detected names
 - Note in `progress.md` which characters are pre-built vs need building
 - **2D**: The Step 1.5 subagent will use photo-composite characters for these
-- **3D**: For each celebrity, try: (1) search `3d-character-library/manifest.json` for a match, (2) search Sketchfab for `"<name> animated character"` with `find-3d-asset.mjs`, (3) search by archetype (e.g. "suit man animated" for politicians), (4) fall back to best-matching library model. Differentiate multiple characters by using different base models.
+- **3D**: For each celebrity, try: (1) generate with Meshy AI — `"a cartoon caricature of <Name>, <distinguishing features>, low poly game character"` then rig for animation, (2) check `3d-character-library/manifest.json` for a pre-built match, (3) search Sketchfab with `find-3d-asset.mjs`, (4) fall back to best-matching library model. Meshy generation produces the best results for named personalities since it can capture specific visual features.
 
 Create all pipeline tasks upfront using `TaskCreate`:
 
 1. Scaffold game from template
-2. Add assets: pixel art sprites (2D) or GLB models + animated characters (3D)
+2. Add assets: pixel art sprites (2D) or Meshy AI-generated GLB models + animated characters (3D)
 3. Add visual polish (particles, transitions, juice)
 4. Record promo video (autonomous 50 FPS capture)
 5. Add audio (BGM + SFX)
@@ -561,87 +561,94 @@ Launch a `Task` subagent with these instructions:
 
 #### 3D Asset Flow (Three.js games)
 
-For 3D games, replace primitives with real GLB models and animated characters. This is the 3D parallel of the 2D pixel art step above.
+For 3D games, generate custom models with Meshy AI and integrate them as animated characters and world props. This is the 3D parallel of the 2D pixel art step above.
 
-**Pre-step: Character Selection**
+**Pre-step: Get Meshy API Key**
 
-1. **Read `design-brief.md`** to identify all characters (player + opponents/NPCs) and their names.
+Before starting 3D asset work, check if `MESHY_API_KEY` is set. If not, **ask the user**:
 
-2. **Resolve the 3D character library** — find `3d-character-library/manifest.json` relative to the plugin root.
+> I'll generate custom 3D models with Meshy AI for the best results — characters that match your game's exact theme and style. You can get a free API key in 30 seconds:
+> 1. Sign up at https://app.meshy.ai
+> 2. Go to Settings → API Keys
+> 3. Create a new API key
+>
+> What is your Meshy API key? (Or type "skip" to use generic model libraries instead)
 
-3. **For EACH character (player AND opponents), try these tiers in order:**
+Store the key for all subsequent `meshy-generate.mjs` calls. If the user skips, use the fallback tiers below.
 
-**Tier 1 — Pre-built in library**: Check if a matching character exists in `3d-character-library/manifest.json` by name or theme. If yes, copy the GLB:
+**Pre-step: Character Generation**
+
+1. **Read `design-brief.md`** to identify all characters (player + opponents/NPCs) and their names/descriptions.
+
+2. **For EACH character (player AND opponents), try these tiers in order:**
+
+**Tier 1 — Generate with Meshy AI** (preferred): Generate a custom character model matching the game concept. Craft a descriptive prompt:
+```bash
+# Generate the character model
+MESHY_API_KEY=<key> node <plugin-root>/scripts/meshy-generate.mjs \
+  --mode text-to-3d \
+  --prompt "a stylized <character description>, low poly game character, full body" \
+  --polycount 15000 --pbr \
+  --output <project-dir>/public/assets/models/ --slug <character-slug>
+
+# Rig for animation (humanoid characters only)
+# Read the refineTaskId from the meta.json
+MESHY_API_KEY=<key> node <plugin-root>/scripts/meshy-generate.mjs \
+  --mode rig --task-id <refine-task-id> --height 1.7 \
+  --output <project-dir>/public/assets/models/ --slug <character-slug>-rigged
+```
+Rigging produces a GLB with basic walk/run animations. Log clip names to build the `clipMap`.
+
+For named personalities, be specific in the prompt: `"a cartoon caricature of Trump, blonde hair, suit, red tie, low poly game character, full body"`.
+
+For multiple characters, generate each with a distinct description for visual variety.
+
+**Tier 2 — Pre-built in `3d-character-library/`** (Meshy unavailable): Check `manifest.json` for a name/theme match. Copy the GLB:
 ```bash
 cp <plugin-root>/3d-character-library/models/<model>.glb \
    <project-dir>/public/assets/models/<slug>.glb
 ```
-Result: Animated character with idle/walk/run. Done.
 
-**Tier 2 — Search Sketchfab for a character-specific animated model**: Use `find-3d-asset.mjs` to search for an animated model matching the character. Search for the character by name or description:
+**Tier 3 — Search Sketchfab**: Use `find-3d-asset.mjs` to search for a matching animated model:
 ```bash
-# Search for animated character models with walk/idle
 node <plugin-root>/scripts/find-3d-asset.mjs \
   --query "<character name> animated character" \
   --max-faces 10000 --list-only
-
-# If SKETCHFAB_TOKEN is set, download the best match
-SKETCHFAB_TOKEN=<token> node <plugin-root>/scripts/find-3d-asset.mjs \
-  --query "<character name> animated" \
-  --max-faces 10000 --output <project-dir>/public/assets/models/ \
-  --slug <character-slug>
-```
-After download, inspect clip names by loading in a test page or logging them. Create a `clipMap` for the model. If the model has idle+walk animations, it's ready. If not, fall to Tier 3.
-
-**Tier 3 — Search for a thematic character model**: If no character-specific model is found, search by theme/archetype:
-```bash
-# Political figure → "suit man animated", "business man walk"
-# Military figure → use Soldier.glb
-# Tech figure → use Xbot.glb or RobotExpressive.glb
-# Animal → use Fox.glb or search for specific animal
-node <plugin-root>/scripts/find-3d-asset.mjs \
-  --query "low poly <archetype> animated walk" \
-  --max-faces 10000 --list-only
 ```
 
-**Tier 4 — Generic library fallback**: Use the best-matching model from `3d-character-library/`:
+**Tier 4 — Generic library fallback**: Use the best match from `3d-character-library/`:
 - **Soldier** — action/military/default human
 - **Xbot** — sci-fi/tech/futuristic
 - **RobotExpressive** — cartoon/casual/fun (most animations)
 - **Fox** — nature/animal
 
-Copy the GLB and use its pre-defined clipMap from `manifest.json`.
+When 2+ characters fall back to library, use different models to differentiate them.
 
-**Differentiate multiple characters**: When a game has 2+ characters using the same base model (e.g., both Trump and Biden fall back to Soldier), differentiate them:
-- Use different models from the library (e.g., Soldier for player, Xbot for opponent)
-- Or use the same model but note in Constants.js that materials should be recolored
+**3. Generate / search for world objects** — Read `design-brief.md` entity list:
+```bash
+# With Meshy (preferred) — generate each prop
+MESHY_API_KEY=<key> node <plugin-root>/scripts/meshy-generate.mjs \
+  --mode text-to-3d \
+  --prompt "a <entity description>, low poly game asset" \
+  --polycount 5000 \
+  --output <project-dir>/public/assets/models/ --slug <entity-slug>
 
-**4. Record results** for each character in `progress.md`:
+# Without Meshy — search free libraries
+node <plugin-root>/scripts/find-3d-asset.mjs --query "<entity description>" \
+  --source polyhaven --output <project-dir>/public/assets/models/
+```
+
+**4. Record results** in `progress.md`:
 ```
 ## 3D Characters
-- trump (player): Tier 2 — downloaded "animated politician" from Sketchfab (idle/walk/run)
-- biden (opponent): Tier 4 — Xbot.glb from 3d-character-library (idle/walk/run)
+- knight (player): Tier 1 — Meshy AI generated + rigged (idle/walk/run)
+- goblin (enemy): Tier 1 — Meshy AI generated + rigged (idle/walk/run)
+
+## 3D Assets
+- tree: Meshy AI generated (static prop)
+- barrel: Meshy AI generated (static prop)
+- house: Poly Haven fallback (CC0)
 ```
-
-**5. Search for world objects** — Read `design-brief.md` entity list and search for GLB props:
-   ```bash
-   # For each entity type that needs a model (buildings, trees, obstacles, collectibles)
-   node <plugin-root>/scripts/find-3d-asset.mjs --query "<entity description>" \
-     --source polyhaven --output <project-dir>/public/assets/models/
-
-   # Poly Haven is best for props (no auth, CC0, GLTF with textures)
-   # Sketchfab for more variety (needs SKETCHFAB_TOKEN for download)
-   # Use --list-only first to review results before downloading
-   ```
-
-5. **Record results** in `progress.md`:
-   ```
-   ## 3D Assets
-   - Player: Soldier.glb (from 3d-character-library, idle/walk/run)
-   - Building: house.gltf (from Poly Haven, CC0)
-   - Tree: downloaded via find-3d-asset.mjs (Sketchfab, CC-BY)
-   - Barrel: barrel.gltf (from Poly Haven, CC0)
-   ```
 
 **Launch a `Task` subagent with these instructions:**
 
@@ -649,14 +656,14 @@ Copy the GLB and use its pre-defined clipMap from `manifest.json`.
 >
 > **Project path**: `<project-dir>`
 > **Engine**: 3D (Three.js)
-> **Skill to load**: `game-3d-assets`
+> **Skill to load**: `game-3d-assets` and `meshyai`
 >
-> **Read `progress.md`** at the project root before starting. It lists downloaded models and the selected player character.
+> **Read `progress.md`** at the project root before starting. It lists generated/downloaded models and the character details.
 >
-> **Character GLB is already copied** to `public/assets/models/`. Set up the character controller:
+> **Character GLBs are already in** `public/assets/models/`. Set up the character controller:
 >
 > 1. Create `src/level/AssetLoader.js` — **CRITICAL: use `SkeletonUtils.clone()` for animated models** (regular `.clone()` breaks skeleton bindings → T-pose). Import from `three/addons/utils/SkeletonUtils.js`.
-> 2. Add `CHARACTER` config to `Constants.js` with: `path`, `scale`, `facingOffset`, `clipMap` (mapping `idle`/`walk`/`run` to actual clip names — these vary per model)
+> 2. Add `CHARACTER` config to `Constants.js` with: `path`, `scale`, `facingOffset`, `clipMap` (mapping `idle`/`walk`/`run` to actual clip names — these vary per model). For Meshy-rigged models, log clip names on first load to discover the correct names.
 > 3. Update `Player.js`:
 >    - Use `THREE.Group` as position anchor
 >    - Load model with `loadAnimatedModel()`, set up `AnimationMixer`
@@ -669,12 +676,12 @@ Copy the GLB and use its pre-defined clipMap from `manifest.json`.
 >    - Camera follows player: move both `orbitControls.target` and `camera.position` by player delta each frame
 >    - Pass `orbitControls.getAzimuthalAngle()` to `Player.update()` for camera-relative movement
 >    - Do NOT call `camera.lookAt()` — OrbitControls manages this
-> 5. Replace entity primitives with downloaded GLB models via `loadModel()` (static) or `loadAnimatedModel()` (animated)
-> 6. Add `ASSET_PATHS` and `MODEL_CONFIG` to Constants.js for each downloaded model
+> 5. Replace entity primitives with GLB models via `loadModel()` (static) or `loadAnimatedModel()` (animated)
+> 6. Add `ASSET_PATHS` and `MODEL_CONFIG` to Constants.js for each model
 > 7. Add `THREE.GridHelper` to ground for visible movement reference
 > 8. Add primitive fallback in `.catch()` for every model load
 >
-> **After completing your work**, append a `## Step 1.5: 3D Assets` section to `progress.md` with: player character used, models loaded, any scale/orientation adjustments.
+> **After completing your work**, append a `## Step 1.5: 3D Assets` section to `progress.md` with: models used (Meshy-generated vs library), scale/orientation adjustments.
 >
 > Do NOT run builds — the orchestrator handles verification.
 
@@ -688,9 +695,9 @@ Copy the GLB and use its pre-defined clipMap from `manifest.json`.
 > - `src/sprites/` — all sprite data, palettes, and background tiles
 
 **Tell the user (3D):**
-> Your game now has real 3D models and an animated character controller! The player walks, runs, and idles with proper animations. Props and scenery are loaded from GLB files. Here's what was created:
+> Your game now has custom 3D models! Characters were generated with Meshy AI (or sourced from the model library), rigged, and animated with walk/run/idle. Props and scenery are loaded from GLB files. Here's what was created:
 > - `src/level/AssetLoader.js` — model loader with SkeletonUtils
-> - `public/assets/models/` — downloaded GLB models
+> - `public/assets/models/` — Meshy-generated and/or library GLB models
 > - OrbitControls camera with WASD movement
 
 > **Next up: visual polish.** I'll add particles, screen transitions, and juice effects. Ready?
