@@ -4,14 +4,15 @@
 // Reads punch/block/headPop state from GameState and animates:
 //   - Gloves extending forward during punches (primitives) / lunge (GLB)
 //   - Arms raising during block (primitives) / tilt back (GLB)
-//   - Head popping up on knockout (both primitives and GLB)
+//   - Head popping up on knockout (head bone if available, else whole model)
 //   - Idle bob animation (both)
 //
-// When a GLB model is present (robot.userData.glbModel), the system animates
-// the entire model as a single unit since Meshy AI static models have no
-// identifiable sub-parts. When using primitives, it animates individual parts.
+// For rigged GLB models, calls mixer.update(delta) every frame to tick the
+// AnimationMixer. Walk/run clips can play as idle or entrance animations.
+// Programmatic punch/block/head-pop still operates on the wrapper group.
 // =============================================================================
 
+import * as THREE from 'three';
 import { COMBAT, ROBOT } from '../core/Constants.js';
 import { gameState } from '../core/GameState.js';
 
@@ -31,6 +32,73 @@ export class AnimationSystem {
     // GLB wrapper groups start at y=0, so base Y for animation offsets is always 0
     this.playerGlbBaseY = 0;
     this.opponentGlbBaseY = 0;
+
+    // Start idle animations for rigged models
+    this._startIdleAnimation(playerRobot);
+    this._startIdleAnimation(opponentRobot);
+  }
+
+  /**
+   * Start idle animation for a rigged model.
+   * Uses the walk clip at a very slow timeScale as a subtle idle motion,
+   * or the base model's first clip if available.
+   */
+  _startIdleAnimation(robot) {
+    if (!robot.userData.mixer || !robot.userData.actions) return;
+
+    const actions = robot.userData.actions;
+
+    // Priority: dedicated idle clip > walk at slow speed > first available clip
+    let idleAction = null;
+
+    // Check for an idle clip from the base model
+    for (const [name, action] of Object.entries(actions)) {
+      const lower = name.toLowerCase();
+      if (lower.includes('idle') || lower === 'take 001' || lower === 'mixamo.com') {
+        idleAction = action;
+        break;
+      }
+    }
+
+    // Fallback: use walk clip at slow speed for a subtle idle sway
+    if (!idleAction && actions['walk']) {
+      idleAction = actions['walk'];
+      idleAction.setEffectiveTimeScale(0.3); // Very slow walk as idle
+    }
+
+    // Last resort: first available clip
+    if (!idleAction) {
+      const firstKey = Object.keys(actions)[0];
+      if (firstKey) {
+        idleAction = actions[firstKey];
+        idleAction.setEffectiveTimeScale(0.3);
+      }
+    }
+
+    if (idleAction) {
+      idleAction.reset().setEffectiveWeight(1).setLoop(THREE.LoopRepeat).play();
+      robot.userData.activeAction = idleAction;
+      console.log(`[AnimationSystem] Started idle animation: "${idleAction.getClip().name}"`);
+    }
+  }
+
+  /**
+   * Fade from the current action to a new one.
+   */
+  _fadeToAction(robot, newAction, duration = 0.3) {
+    if (!newAction) return;
+    const current = robot.userData.activeAction;
+    if (current === newAction) return;
+
+    if (current) {
+      current.fadeOut(duration);
+    }
+    newAction.reset()
+      .setEffectiveTimeScale(1)
+      .setEffectiveWeight(1)
+      .fadeIn(duration)
+      .play();
+    robot.userData.activeAction = newAction;
   }
 
   update(delta) {
@@ -39,11 +107,20 @@ export class AnimationSystem {
     const playerHasGlb = !!this.playerRobot.userData.glbModel;
     const opponentHasGlb = !!this.opponentRobot.userData.glbModel;
 
+    // --- Update AnimationMixers for rigged models ---
+    if (this.playerRobot.userData.mixer) {
+      this.playerRobot.userData.mixer.update(delta);
+    }
+    if (this.opponentRobot.userData.mixer) {
+      this.opponentRobot.userData.mixer.update(delta);
+    }
+
     // --- Idle bob ---
     const bobAmount = Math.sin(this.elapsedTime * 2.5) * 0.02;
 
     if (playerHasGlb) {
-      // Only apply bob if head is not popped (head pop takes priority on Y)
+      // For rigged models, only apply a very subtle bob if head is not popped
+      // The mixer handles skeletal idle, wrapper handles positional bob
       if (!gameState.playerHeadPopped) {
         this.playerRobot.userData.glbModel.position.y = bobAmount;
       }
@@ -143,6 +220,8 @@ export class AnimationSystem {
 
   // =========================================================================
   // GLB model animations — animate the whole model as a single unit
+  // The rigged skeleton is driven by the AnimationMixer (idle/walk/run clips).
+  // Programmatic wrapper transforms handle punch lunge, block tilt, head pop.
   // =========================================================================
 
   /**
@@ -192,20 +271,38 @@ export class AnimationSystem {
   }
 
   /**
-   * GLB head pop: the whole model shoots upward and tilts.
+   * GLB head pop: animate the head bone upward if available,
+   * otherwise the whole model shoots upward and tilts.
    */
   animateGlbHeadPop(robot, isPopped, baseY, delta) {
     const wrapper = robot.userData.glbModel;
+    const headBone = robot.userData.headBone;
 
-    if (isPopped) {
-      const targetY = baseY + ROBOT.HEAD_POP_DISTANCE;
-      wrapper.position.y += (targetY - wrapper.position.y) * ROBOT.HEAD_POP_SPEED * delta;
-      // Tilt backward for dramatic effect
-      wrapper.rotation.x += (0.3 - wrapper.rotation.x) * 0.1;
+    if (headBone) {
+      // Animate the head bone for a more realistic head-pop effect
+      const headBaseY = robot.userData.headBoneBaseY;
+      if (isPopped) {
+        const targetBoneY = headBaseY + ROBOT.HEAD_POP_DISTANCE;
+        headBone.position.y += (targetBoneY - headBone.position.y) * ROBOT.HEAD_POP_SPEED * delta;
+        // Also tilt the whole model back slightly for dramatic effect
+        wrapper.rotation.x += (0.15 - wrapper.rotation.x) * 0.1;
+      } else {
+        const returnSpeed = COMBAT.HEAD_RESET_SPEED * delta;
+        headBone.position.y += (headBaseY - headBone.position.y) * returnSpeed;
+        wrapper.rotation.x += (0 - wrapper.rotation.x) * 0.1;
+      }
     } else {
-      const returnSpeed = COMBAT.HEAD_RESET_SPEED * delta;
-      wrapper.position.y += (baseY - wrapper.position.y) * returnSpeed;
-      wrapper.rotation.x += (0 - wrapper.rotation.x) * 0.1;
+      // No head bone — animate the whole model upward (original behavior)
+      if (isPopped) {
+        const targetY = baseY + ROBOT.HEAD_POP_DISTANCE;
+        wrapper.position.y += (targetY - wrapper.position.y) * ROBOT.HEAD_POP_SPEED * delta;
+        // Tilt backward for dramatic effect
+        wrapper.rotation.x += (0.3 - wrapper.rotation.x) * 0.1;
+      } else {
+        const returnSpeed = COMBAT.HEAD_RESET_SPEED * delta;
+        wrapper.position.y += (baseY - wrapper.position.y) * returnSpeed;
+        wrapper.rotation.x += (0 - wrapper.rotation.x) * 0.1;
+      }
     }
   }
 
@@ -301,5 +398,9 @@ export class AnimationSystem {
     this.opponentHeadBaseY = opponentRobot.userData.headGroup.position.y;
     this.playerGlbBaseY = 0;
     this.opponentGlbBaseY = 0;
+
+    // Re-start idle animations for the new robots
+    this._startIdleAnimation(playerRobot);
+    this._startIdleAnimation(opponentRobot);
   }
 }

@@ -1,22 +1,23 @@
 // =============================================================================
-// Robot.js — Builds a boxing robot from a GLB model with primitive fallback
+// Robot.js — Builds a boxing robot from a rigged GLB model with primitive fallback
 //
 // Each robot is a THREE.Group with named child groups for animation:
 //   - body, head, leftArm, rightArm, leftGlove, rightGlove, legs
 // The head group can be animated upward for the "head pop" knockout.
 // Gloves animate forward for punches.
 //
-// GLB models are static (not rigged) — the existing AnimationSystem drives
-// all motion by manipulating group positions/rotations programmatically.
+// Rigged GLB models are loaded via loadAnimatedModel() (SkeletonUtils.clone).
+// AnimationMixer + walk/run clips from separate GLBs are stored in userData
+// so the AnimationSystem can drive them.
 // =============================================================================
 
 import * as THREE from 'three';
 import { ROBOT, MODELS } from '../core/Constants.js';
-import { loadModel } from '../level/AssetLoader.js';
+import { loadModel, loadAnimatedModel } from '../level/AssetLoader.js';
 
 /**
- * Create a robot mesh group with GLB model + animation helper groups.
- * Tries to load the GLB model first; falls back to primitives on error.
+ * Create a robot mesh group with rigged GLB model + animation helpers.
+ * Tries to load the rigged GLB model first; falls back to primitives on error.
  *
  * @param {{ body: number, dark: number, glove: number, accent: number }} colors
  * @param {boolean} facingPositiveZ — true if robot faces +Z (toward camera)
@@ -76,10 +77,14 @@ export async function createRobot(colors, facingPositiveZ, role) {
   group.userData.leftGloveRest = leftGlove.position.clone();
   group.userData.rightGloveRest = rightGlove.position.clone();
 
-  // --- Try to load GLB model ---
+  // --- Try to load rigged GLB model ---
   let glbLoaded = false;
   try {
-    const model = await loadModel(modelConfig.path);
+    // Load the rigged base model using SkeletonUtils.clone (preserves skeleton bindings)
+    const { model, clips } = await loadAnimatedModel(modelConfig.path);
+
+    console.log(`[Robot] Loaded rigged model: ${modelConfig.path}`);
+    console.log('[Robot] Clips:', clips.map(c => c.name));
 
     // Apply scale
     const scale = modelConfig.scale;
@@ -118,9 +123,81 @@ export async function createRobot(colors, facingPositiveZ, role) {
 
     // Store the wrapper as the animation target
     group.userData.glbModel = glbWrapper;
-    glbLoaded = true;
 
-    console.log(`[Robot] Loaded ${modelConfig.path} — size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
+    // --- Create AnimationMixer for the rigged model ---
+    const mixer = new THREE.AnimationMixer(model);
+    group.userData.mixer = mixer;
+    group.userData.actions = {};
+
+    // Store any clips from the base model (e.g., idle/default pose)
+    if (clips.length > 0) {
+      for (const clip of clips) {
+        const action = mixer.clipAction(clip);
+        group.userData.actions[clip.name] = action;
+        console.log(`[Robot] Registered base clip: "${clip.name}" (duration: ${clip.duration.toFixed(2)}s)`);
+      }
+    }
+
+    // --- Load walk animation clips from separate GLB ---
+    if (modelConfig.walkPath) {
+      try {
+        const walkResult = await loadAnimatedModel(modelConfig.walkPath);
+        console.log('[Robot] Walk clips:', walkResult.clips.map(c => c.name));
+        for (const clip of walkResult.clips) {
+          const action = mixer.clipAction(clip);
+          const clipName = 'walk_' + clip.name;
+          group.userData.actions[clipName] = action;
+          // Also store as 'walk' shorthand if it is the first/only clip
+          if (!group.userData.actions['walk']) {
+            group.userData.actions['walk'] = action;
+          }
+          console.log(`[Robot] Registered walk clip: "${clipName}" (duration: ${clip.duration.toFixed(2)}s)`);
+        }
+      } catch (walkErr) {
+        console.warn(`[Robot] Failed to load walk animation: ${walkErr.message}`);
+      }
+    }
+
+    // --- Load run animation clips from separate GLB ---
+    if (modelConfig.runPath) {
+      try {
+        const runResult = await loadAnimatedModel(modelConfig.runPath);
+        console.log('[Robot] Run clips:', runResult.clips.map(c => c.name));
+        for (const clip of runResult.clips) {
+          const action = mixer.clipAction(clip);
+          const clipName = 'run_' + clip.name;
+          group.userData.actions[clipName] = action;
+          // Also store as 'run' shorthand
+          if (!group.userData.actions['run']) {
+            group.userData.actions['run'] = action;
+          }
+          console.log(`[Robot] Registered run clip: "${clipName}" (duration: ${clip.duration.toFixed(2)}s)`);
+        }
+      } catch (runErr) {
+        console.warn(`[Robot] Failed to load run animation: ${runErr.message}`);
+      }
+    }
+
+    // --- Try to find head bone for head-pop animation ---
+    let headBone = null;
+    model.traverse((child) => {
+      if (child.isBone) {
+        const name = child.name.toLowerCase();
+        if (name.includes('head') && !headBone) {
+          headBone = child;
+        }
+      }
+    });
+    if (headBone) {
+      group.userData.headBone = headBone;
+      group.userData.headBoneBaseY = headBone.position.y;
+      console.log(`[Robot] Found head bone: "${headBone.name}" at y=${headBone.position.y.toFixed(3)}`);
+    } else {
+      console.log('[Robot] No head bone found — will animate whole model for head pop');
+    }
+
+    glbLoaded = true;
+    console.log(`[Robot] Rigged model ready — size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}, actions: [${Object.keys(group.userData.actions).join(', ')}]`);
   } catch (err) {
     console.warn(`[Robot] Failed to load ${modelConfig.path}, using primitive fallback:`, err.message);
   }
@@ -242,8 +319,17 @@ function buildPrimitiveRobot(group, colors, facing) {
 
 /**
  * Dispose all geometries and materials in a robot group.
+ * Also stops the AnimationMixer if present.
  */
 export function disposeRobot(group) {
+  // Stop and uncache the mixer
+  if (group.userData.mixer) {
+    group.userData.mixer.stopAllAction();
+    group.userData.mixer.uncacheRoot(group.userData.mixer.getRoot());
+    group.userData.mixer = null;
+    group.userData.actions = null;
+  }
+
   group.traverse((child) => {
     if (child.isMesh) {
       child.geometry.dispose();

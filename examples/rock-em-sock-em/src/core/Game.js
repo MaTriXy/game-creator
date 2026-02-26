@@ -89,8 +89,13 @@ export class Game {
    */
   async init() {
     try {
-      // Collect all model paths to preload
-      const modelPaths = Object.values(MODELS).map(m => m.path);
+      // Collect all model paths to preload (base models + animation GLBs)
+      const modelPaths = [];
+      for (const config of Object.values(MODELS)) {
+        if (config.path) modelPaths.push(config.path);
+        if (config.walkPath) modelPaths.push(config.walkPath);
+        if (config.runPath) modelPaths.push(config.runPath);
+      }
 
       console.log('[Game] Preloading models:', modelPaths);
       await preloadAll(modelPaths, (loaded, total) => {

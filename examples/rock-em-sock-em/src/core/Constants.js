@@ -175,12 +175,16 @@ export const HEALTH_BAR = {
 // --- 3D Model configuration ---
 export const MODELS = {
   BLUE_BOMBER: {
-    path: 'assets/models/blue-bomber.glb',
+    path: 'assets/models/blue-bomber-rigged.glb',
+    walkPath: 'assets/models/blue-bomber-walk.glb',
+    runPath: 'assets/models/blue-bomber-run.glb',
     scale: 1.0,
     rotationY: Math.PI,  // Meshy models face +Z; rotate to face -Z (toward opponent)
   },
   RED_ROCKER: {
-    path: 'assets/models/red-rocker.glb',
+    path: 'assets/models/red-rocker-rigged.glb',
+    walkPath: 'assets/models/red-rocker-walk.glb',
+    runPath: 'assets/models/red-rocker-run.glb',
     scale: 1.0,
     rotationY: 0,        // faces +Z by default (toward player) — correct
   },
