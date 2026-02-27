@@ -162,9 +162,11 @@ Create `src/level/AssetLoader.js`. **Critical: use `SkeletonUtils.clone()` for a
 ```js
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder); // required for meshopt-compressed GLBs
 const cache = new Map();
 
 /** Load a static (non-animated) model. Uses regular clone. */
@@ -210,6 +212,10 @@ function _load(path) {
   return cache.get(path);
 }
 ```
+
+### Compressed GLB Support
+
+GLBs optimized by `scripts/optimize-glb.mjs` (or `meshy-generate.mjs` / `find-3d-asset.mjs` which call it automatically) use meshopt compression. The `MeshoptDecoder` import + `loader.setMeshoptDecoder()` call above is required to load these compressed files. Without it, Three.js will fail to parse the geometry buffers.
 
 ### CRITICAL: SkeletonUtils.clone vs .clone()
 

@@ -21,7 +21,7 @@
  */
 
 import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
-import { resolve, join, basename } from 'node:path';
+import { resolve, join, basename, dirname, fileURLToPath } from 'node:path';
 import { execSync } from 'node:child_process';
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,7 @@ const listOnly = hasFlag('list-only');
 const maxResults = parseInt(getArg('limit', '5'), 10);
 const maxFaces = parseInt(getArg('max-faces', '50000'), 10);
 const slug = getArg('slug'); // override output filename
+const noOptimize = hasFlag('no-optimize');
 
 if (!query) {
   console.error(`Usage: node scripts/find-3d-asset.mjs --query "<search>" [options]
@@ -57,6 +58,7 @@ Options:
   --limit <n>          Max search results to show (default: 5)
   --max-faces <n>      Max face count filter for Sketchfab (default: 50000)
   --slug <name>        Override output filename slug
+  --no-optimize        Skip GLB optimization after download
 
 Sources:
   auto       — Try Poly.pizza → Sketchfab → Poly Haven
@@ -101,6 +103,31 @@ function formatBytes(bytes) {
 function writeMeta(outPath, meta) {
   writeFileSync(outPath, JSON.stringify(meta, null, 2) + '\n');
   console.log(`  meta → ${outPath}`);
+}
+
+/**
+ * Run optimize-glb.mjs on a downloaded GLB file.
+ * Skips non-GLB files (e.g. .gltf from Poly Haven) and if --no-optimize is set.
+ */
+function optimizeGlbFile(modelPath) {
+  if (noOptimize || !modelPath || !modelPath.endsWith('.glb')) return;
+
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const optimizeScript = join(scriptDir, 'optimize-glb.mjs');
+
+  if (!existsSync(optimizeScript)) {
+    console.log('  [optimize] optimize-glb.mjs not found — skipping');
+    return;
+  }
+
+  try {
+    execSync(`node "${optimizeScript}" "${modelPath}"`, {
+      stdio: 'inherit',
+      timeout: 120_000,
+    });
+  } catch {
+    console.log('  [optimize] GLB optimization failed — keeping original file');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +514,9 @@ async function main() {
       modelPath = await downloadPolyHaven(best, outDir, fileSlug);
       break;
   }
+
+  // Optimize downloaded GLB (skips .gltf files from Poly Haven)
+  optimizeGlbFile(modelPath);
 
   // Write meta.json regardless of download success
   const metaPath = join(outDir, `${fileSlug}.meta.json`);

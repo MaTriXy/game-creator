@@ -157,6 +157,33 @@ MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
   --mode status --task-id <id> --task-type text-to-3d
 ```
 
+## Automatic GLB Optimization
+
+All downloaded GLBs are automatically optimized via `scripts/optimize-glb.mjs` to reduce file sizes by 80–95%. The pipeline resizes textures to 1024×1024, converts them to WebP, and applies meshopt compression.
+
+- Optimization runs by default after every GLB download (text-to-3d, image-to-3d, rig, animate)
+- Use `--no-optimize` to skip optimization and keep the raw Meshy output
+- Use `--texture-size <n>` to change the max texture dimension (default: 1024)
+- First run may take a moment as `npx` downloads `@gltf-transform/cli`
+- If `gltf-transform` is unavailable, the script warns and continues with the raw file
+
+Optimized GLBs use meshopt compression and require `MeshoptDecoder` at runtime — the template `AssetLoader.js` includes this automatically.
+
+```bash
+# Skip optimization for a specific generation
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode text-to-3d --prompt "a barrel" --preview-only \
+  --no-optimize --output public/assets/models/ --slug barrel
+
+# Custom texture size (e.g., 512 for mobile)
+MESHY_API_KEY=<key> node scripts/meshy-generate.mjs \
+  --mode text-to-3d --prompt "a barrel" --preview-only \
+  --texture-size 512 --output public/assets/models/ --slug barrel
+
+# Re-optimize an existing GLB directly
+node scripts/optimize-glb.mjs public/assets/models/barrel.glb --texture-size 512
+```
+
 ## API Reference
 
 Base URL: `https://api.meshy.ai/openapi`
@@ -172,7 +199,7 @@ Preview payload:
   "prompt": "a cartoon knight with sword and shield",
   "ai_model": "latest",
   "topology": "triangle",
-  "target_polycount": 30000
+  "target_polycount": 10000
 }
 ```
 
@@ -211,7 +238,7 @@ Optional parameters:
 - `ai_model`: `meshy-5`, `meshy-6`, `latest` (default: `latest`)
 - `model_type`: `standard` or `lowpoly`
 - `topology`: `quad` or `triangle` (default: `triangle`)
-- `target_polycount`: 100–300,000 (default: 30,000)
+- `target_polycount`: 100–300,000 (default: 10,000)
 - `symmetry_mode`: `off`, `auto`, `on` (default: `auto`)
 - `pose_mode`: `a-pose`, `t-pose`, or empty string
 - `enable_pbr`: generates metallic, roughness, and normal maps
@@ -227,7 +254,7 @@ Optional parameters:
   "enable_pbr": false,
   "should_texture": true,
   "topology": "triangle",
-  "target_polycount": 30000
+  "target_polycount": 10000
 }
 ```
 

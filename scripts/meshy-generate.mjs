@@ -49,8 +49,9 @@
  *   MESHY_API_KEY       — Required. Get one at https://app.meshy.ai → API Keys
  */
 
-import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
-import { resolve, join, basename } from 'node:path';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
+import { resolve, join, basename, dirname, fileURLToPath } from 'node:path';
+import { execSync } from 'node:child_process';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,10 +87,12 @@ const actionId = parseInt(getArg('action-id', '0'), 10);
 const previewOnly = hasFlag('preview-only');
 const enablePbr = hasFlag('pbr');
 const topology = getArg('topology', 'triangle');
-const targetPolycount = parseInt(getArg('polycount', '30000'), 10);
+const targetPolycount = parseInt(getArg('polycount', '10000'), 10);
 const texturePrompt = getArg('texture-prompt');
 const heightMeters = parseFloat(getArg('height', '1.7'));
 const noPoll = hasFlag('no-poll');
+const noOptimize = hasFlag('no-optimize');
+const optimizeTextureSize = parseInt(getArg('texture-size', '1024'), 10);
 
 const API_KEY = process.env.MESHY_API_KEY;
 
@@ -124,10 +127,12 @@ Options:
   --preview-only         Skip refine step (text-to-3d)
   --pbr                  Enable PBR texture maps
   --topology <type>      quad or triangle (default: triangle)
-  --polycount <n>        Target polygon count (default: 30000)
+  --polycount <n>        Target polygon count (default: 10000)
   --texture-prompt <t>   Additional texture guidance
   --height <meters>      Character height for rigging (default: 1.7)
   --no-poll              Submit task and exit without waiting
+  --no-optimize          Skip GLB optimization (optimization ON by default)
+  --texture-size <n>     Max texture dimension for optimization (default: 1024)
 
 Environment:
   MESHY_API_KEY          API key from https://app.meshy.ai`);
@@ -204,6 +209,31 @@ function writeMeta(outPath, meta) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Run optimize-glb.mjs on a downloaded GLB file.
+ * Logs before/after sizes. Skips if --no-optimize flag is set.
+ */
+function optimizeGlbFile(glbPath) {
+  if (noOptimize || !glbPath || !glbPath.endsWith('.glb')) return;
+
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const optimizeScript = join(scriptDir, 'optimize-glb.mjs');
+
+  if (!existsSync(optimizeScript)) {
+    console.log('  [meshy] optimize-glb.mjs not found — skipping optimization');
+    return;
+  }
+
+  try {
+    execSync(`node "${optimizeScript}" "${glbPath}" --texture-size ${optimizeTextureSize}`, {
+      stdio: 'inherit',
+      timeout: 120_000,
+    });
+  } catch {
+    console.log('  [meshy] GLB optimization failed — keeping original file');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +335,7 @@ async function textTo3D() {
 
   if (previewOnly) {
     const modelPath = await downloadModel(previewTask, outDir, fileSlug);
+    optimizeGlbFile(modelPath);
     writeMeta(join(outDir, `${fileSlug}.meta.json`), {
       slug: fileSlug,
       source: 'meshy-ai',
@@ -339,6 +370,7 @@ async function textTo3D() {
 
   // Step 5: Download
   const modelPath = await downloadModel(refineTask, outDir, fileSlug);
+  optimizeGlbFile(modelPath);
 
   writeMeta(join(outDir, `${fileSlug}.meta.json`), {
     slug: fileSlug,
@@ -414,6 +446,7 @@ async function imageTo3D() {
 
   const task = await pollTask(`/v1/image-to-3d/${taskIdResult}`, 'Image-to-3D');
   const modelPath = await downloadModel(task, outDir, fileSlug);
+  optimizeGlbFile(modelPath);
 
   writeMeta(join(outDir, `${fileSlug}.meta.json`), {
     slug: fileSlug,
@@ -479,6 +512,7 @@ async function rigModel() {
     console.log(`  [meshy] Downloading rigged GLB...`);
     const size = await downloadFile(glbUrl, dest);
     console.log(`  model → ${dest} (${formatBytes(size)})`);
+    optimizeGlbFile(dest);
     modelPath = dest;
   }
 
@@ -492,6 +526,7 @@ async function rigModel() {
     try {
       const size = await downloadFile(basicAnims.walking_glb_url, walkDest);
       console.log(`  walk  → ${walkDest} (${formatBytes(size)})`);
+      optimizeGlbFile(walkDest);
       downloadedAnims.walk = basename(walkDest);
     } catch (err) {
       console.log(`  [meshy] Walk download failed: ${err.message}`);
@@ -504,6 +539,7 @@ async function rigModel() {
     try {
       const size = await downloadFile(basicAnims.running_glb_url, runDest);
       console.log(`  run   → ${runDest} (${formatBytes(size)})`);
+      optimizeGlbFile(runDest);
       downloadedAnims.run = basename(runDest);
     } catch (err) {
       console.log(`  [meshy] Run download failed: ${err.message}`);
@@ -578,6 +614,7 @@ async function animateModel() {
     console.log(`  [meshy] Downloading animated GLB...`);
     const size = await downloadFile(glbUrl, dest);
     console.log(`  model → ${dest} (${formatBytes(size)})`);
+    optimizeGlbFile(dest);
     modelPath = dest;
   }
 
