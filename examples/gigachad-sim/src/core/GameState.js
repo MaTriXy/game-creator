@@ -10,7 +10,12 @@ class GameState {
   constructor() {
     this.bestScore = 0;
     this.bestCombo = 0;
-    this.isMuted = false;
+    // Restore mute preference from localStorage
+    try {
+      this.isMuted = localStorage.getItem('muted') === 'true';
+    } catch (_) {
+      this.isMuted = false;
+    }
     this.reset();
   }
 

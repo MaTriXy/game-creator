@@ -6,8 +6,25 @@
 import { Game } from './core/Game.js';
 import { eventBus, Events } from './core/EventBus.js';
 import { gameState } from './core/GameState.js';
+import { initAudioBridge } from './audio/AudioBridge.js';
+import { MuteButton } from './ui/MuteButton.js';
+
+// Initialize audio bridge (wires EventBus events to Web Audio API)
+// Non-blocking — if audio fails, game still works
+try {
+  initAudioBridge();
+} catch (e) {
+  console.warn('[main] Audio bridge init failed (game will work without audio):', e);
+}
 
 const game = new Game();
+
+// Create mute button UI (bottom-right, M key shortcut)
+try {
+  new MuteButton();
+} catch (e) {
+  console.warn('[main] Mute button creation failed:', e);
+}
 
 // Expose for Playwright testing
 window.__GAME__ = game;

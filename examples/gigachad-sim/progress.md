@@ -40,7 +40,7 @@ GigaChad Gym Simulator - endless gym workout simulator where GigaChad catches fa
 - [x] Step 1.5: Replace primitives with Meshy AI GLB models
 - [x] Step 2: Visual design — particles, transitions, screen effects, juice
 - [ ] Step 4: Record promo video
-- [ ] Step 5: Add BGM (gym beats) + SFX (catch clank, miss thud, powerup chime, flex grunt)
+- [x] Step 3: Add BGM (gym beats) + SFX (catch clank, miss thud, powerup chime, flex grunt)
 - [ ] Step 6: Deploy to here.now
 - [ ] Step 7: Monetize with Play.fun
 
@@ -114,3 +114,58 @@ Three new effect systems under `src/effects/`, plus Constants and Game.js integr
 - Hit freeze skips gameplay updates but continues rendering particles/effects for visual continuity
 - Screen shake is managed entirely by ScreenEffects (old manual shake removed from Game.js)
 - All magic numbers in Constants.js under the EFFECTS object
+
+## Step 3: Audio (Complete)
+
+### What was added
+Full procedural audio system using Web Audio API — zero external audio files or npm packages. Background music (step sequencer) and 7 one-shot sound effects, all synthesized with OscillatorNode, GainNode, and BiquadFilterNode.
+
+### New files
+- **`src/audio/AudioManager.js`** — Singleton that owns the AudioContext and master GainNode. Creates/resumes AudioContext on first user interaction (browser autoplay policy). Provides `playMusic(patternFn)`, `stopMusic()`, and `setMuted(bool)`. All audio routes through a single master GainNode for instant global mute.
+- **`src/audio/music.js`** — Two BGM patterns using a Web Audio API step sequencer:
+  - **Gameplay BGM** (140 BPM): Energetic gym/workout beat with 6 layers — 4-on-the-floor kick, offbeat hi-hats, deep sawtooth bass (E minor), power riff melody with 3 phrase variations (A/B/C cycled across 8 phrases = 128 steps before melody repeat), synth stab accents, and high arp texture. Anti-repetition via: different layer lengths (16/12/14/128/8/10 steps), random note omission (12%), and 3 melody phrase variations.
+  - **Game Over BGM** (70 BPM): Somber minor-key piece with descending triangle melody, sustained A minor pad (root + fifth), and deep bass drone. Chord changes between Am and Em.
+- **`src/audio/sfx.js`** — 7 one-shot sound effects, all procedural:
+  - **catch**: Metallic clank — bandpass-filtered square wave with pitch drop (1200->400 Hz), sine overtone ring at 3200 Hz, and noise transient click
+  - **miss**: Heavy thud — sine with deep pitch drop (120->30 Hz), low-passed at 200 Hz, plus noise rumble and sub-bass impact at 50 Hz
+  - **flex**: Power grunt/growl — sawtooth with filter sweep (300->800->200 Hz), plus noise burst for breath/exertion
+  - **powerup**: Ascending chime — 5 sine notes (C5->E5->G5->C6->E6) spaced 50ms apart, plus high shimmer overtone
+  - **combo**: Quick ascending arpeggio (E4->G4->B4) with pitch scaling based on combo count (1.0x to 2.0x), filter opens wider with higher combos
+  - **streak**: Epic fanfare — 4-note sawtooth chord (G3+C4+E4+G4) with filter sweep up, plus rising square accent
+  - **entrance**: Dramatic slam — deep sine boom with pitch drop (200->25 Hz), sub rumble at 40 Hz, noise impact transient, and metallic ring at 1600 Hz
+- **`src/audio/AudioBridge.js`** — Wires EventBus events to audio playback. Initializes AudioContext on first user interaction (click/touchstart/keydown). Handles BGM transitions (gameplay/game over/restart), all 7 SFX triggers, and mute toggle with localStorage persistence. Unmuting resumes appropriate BGM based on game state.
+- **`src/ui/MuteButton.js`** — HTML/Canvas-based mute toggle button. Speaker icon drawn on a `<canvas>` element at 2x resolution for retina. Positioned bottom-right above Play.fun safe zone. Shows sound waves when unmuted, red X when muted. Click/touch handler + M key shortcut.
+
+### Modified files
+- **`src/core/EventBus.js`** — Added `AUDIO_TOGGLE_MUTE: 'audio:toggleMute'` event (now 20 events total)
+- **`src/core/GameState.js`** — `isMuted` now initializes from `localStorage.getItem('muted')` for persistence across sessions
+- **`src/main.js`** — Imports and initializes `initAudioBridge()` and `MuteButton` before game creation. Both wrapped in try/catch for non-blocking fallback.
+
+### Event-to-audio mapping
+| Event | Audio Response |
+|-------|---------------|
+| `GAME_START` | Ensure AudioContext initialized |
+| `MUSIC_GAMEPLAY` | Play gameplay BGM (140 BPM workout beat) |
+| `GAME_OVER` | Stop BGM, play game over BGM (70 BPM somber) |
+| `GAME_RESTART` | Stop all music (GAME_START/MUSIC_GAMEPLAY restarts it) |
+| `WEIGHT_CAUGHT` | Metallic clank SFX |
+| `WEIGHT_MISSED` | Heavy thud SFX |
+| `PLAYER_FLEX` | Power grunt/growl SFX |
+| `POWERUP_COLLECTED` | Ascending chime SFX |
+| `SPECTACLE_COMBO` | Ascending arpeggio SFX (pitch scales with combo) |
+| `SPECTACLE_STREAK` | Epic fanfare blast SFX |
+| `SPECTACLE_ENTRANCE` | Dramatic slam/impact SFX |
+| `AUDIO_TOGGLE_MUTE` | Toggle mute, persist to localStorage, stop/resume BGM |
+
+### Design decisions
+- Zero npm packages — all Web Audio API (OscillatorNode, GainNode, BiquadFilterNode)
+- Audio is completely non-blocking — if AudioContext fails to create, game works without sound
+- All SFX and BGM functions wrapped in try/catch
+- AudioContext created on first user interaction (click/touch/key) per browser autoplay policy
+- Master GainNode controls global volume; `gain.value = 0` for instant mute of all audio
+- Mute state persisted to localStorage and restored on page load
+- BGM uses look-ahead step sequencer (schedules 100ms ahead, checks every 25ms) for sample-accurate timing
+- Different layer lengths in gameplay BGM create polyrhythmic variation (LCM of 16/12/14/128/8/10 = very long before exact repeat)
+- Random note omission (12% chance on quiet layers) adds organic feel
+- Combo SFX pitch scales with combo count for escalating feedback
+- M key shortcut for quick mute toggle during gameplay
