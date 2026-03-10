@@ -300,3 +300,25 @@ curl -s -o /dev/null -w "%{http_code}" "$GAME_URL"
 > - Launch a playcoin for your game (token rewards for players)
 > - Check your leaderboard on Play.fun
 > - Share the play.fun URL on social media
+
+## Troubleshooting
+
+### Auth callback blocked by browser
+**Cause:** Pop-up blockers or strict CORS policies prevent the localhost:9876 OAuth callback from completing.
+**Fix:** Try the manual paste flow instead — run the auth script with `--manual` flag, copy the token from the dashboard at https://play.fun/dashboard, and paste it when prompted.
+
+### Game registration returns 4xx error
+**Cause:** Missing required fields (name, description, or URL) or the game URL is not publicly accessible.
+**Fix:** Ensure the game is deployed and accessible at the provided URL before registering. Check that all required fields are filled in. If using here.now, verify the deployment hasn't expired.
+
+### SDK not loading (ad blockers)
+**Cause:** Browser ad blockers and privacy extensions block the Play.fun SDK CDN (`sdk.play.fun`).
+**Fix:** The SDK integration should be non-blocking — if it fails to load, the game still works. Add a try/catch around SDK initialization and log a warning. Test with ad blockers disabled to verify SDK functionality.
+
+### savePoints modal appears during gameplay
+**Cause:** The SDK's point-saving UI overlay triggers at unexpected times, interrupting the player.
+**Fix:** Only call `savePoints()` during natural game pauses (game over screen, level complete). Never call it during active gameplay. Use the `silent: true` option if available to suppress the modal.
+
+### API key not found
+**Cause:** Credentials not configured or expired since last session.
+**Fix:** Visit https://play.fun/dashboard to refresh creator credentials. Re-run the auth flow with `playfun-auth.js` or manually update the `.env` file with fresh `PLAYFUN_API_KEY` and `PLAYFUN_SECRET_KEY` values.
