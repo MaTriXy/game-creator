@@ -34,6 +34,9 @@ const PREFIX_MAP = {
   sk_:  'SKETCHFAB_TOKEN',
 };
 
+// Placeholder values from skill prompt examples — never save these
+const PLACEHOLDER_RE = /^(your|their|my)[-_]?key[-_]?here$|^<.*>$|^replace[-_]?me$|^xxx+$|^test[-_]?key$/i;
+
 // ── Helpers ───────────────────────────────────────────────────
 
 function findProjectRoot(cwd) {
@@ -70,6 +73,19 @@ function upsertEnv(envPath, key, value) {
   try { chmodSync(envPath, 0o600); } catch { /* best effort */ }
 }
 
+function ensureGitignore(root) {
+  const giPath = join(root, '.gitignore');
+  let content = '';
+  if (existsSync(giPath)) {
+    content = readFileSync(giPath, 'utf8');
+    // Check if .env is already ignored
+    if (/^\/?\.env$/m.test(content)) return;
+  }
+  if (content.length > 0 && !content.endsWith('\n')) content += '\n';
+  content += '\n# API keys (managed by game-creator hook)\n.env\n.env.local\n';
+  writeFileSync(giPath, content, 'utf8');
+}
+
 // ── Main ──────────────────────────────────────────────────────
 
 async function main() {
@@ -88,6 +104,7 @@ async function main() {
   EXPLICIT_RE.lastIndex = 0;
   while ((match = EXPLICIT_RE.exec(prompt)) !== null) {
     const [, key, value] = match;
+    if (PLACEHOLDER_RE.test(value)) continue;
     try {
       upsertEnv(envPath, key, value);
       saved.push(key);
@@ -137,6 +154,9 @@ async function main() {
     process.exit(0); // No key detected — pass through
   }
 
+  // Ensure .env is gitignored in the target project
+  try { ensureGitignore(root); } catch { /* best effort */ }
+
   // Block the message and inject context
   const keyList = saved.join(', ');
   const result = {
@@ -146,7 +166,7 @@ async function main() {
       hookEventName: 'UserPromptSubmit',
       additionalContext: [
         `The user's ${keyList} ha${saved.length > 1 ? 've' : 's'} been securely saved to ${envPath}.`,
-        `Use ${saved.length > 1 ? 'them' : 'it'} with: source ${envPath} && node scripts/meshy-generate.mjs ...`,
+        `Load ${saved.length > 1 ? 'them' : 'it'} with: set -a; . ${envPath}; set +a`,
         'Do NOT ask the user to provide this key again.',
       ].join(' '),
     },

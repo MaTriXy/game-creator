@@ -53,7 +53,7 @@ All Meshy API calls require `MESHY_API_KEY`. **Always check for this key before 
 
 Before prompting the user, check if the key already exists:
 `test -f .env && grep -q MESHY_API_KEY .env && echo "found"`
-If found, load it with `source .env` and skip the prompt.
+If found, export it with `set -a; . .env; set +a` and skip the prompt.
 
 If the key is not set in the environment or `.env`, **ask the user immediately**:
 
@@ -67,7 +67,7 @@ If the key is not set in the environment or `.env`, **ask the user immediately**
 >
 > Or type "skip" to use free model libraries instead.
 
-If the user provides a key, use it via: `source .env && node scripts/meshy-generate.mjs ...`
+If the user provides a key, use it via: `set -a; . .env; set +a && node scripts/meshy-generate.mjs ...`
 
 If the user skips, proceed with fallback sources (character library → Sketchfab → Poly Haven).
 
