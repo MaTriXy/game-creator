@@ -14,14 +14,17 @@ metadata:
 Build a complete browser game from scratch, step by step. This command walks you through the entire pipeline — from an empty folder to a deployed, monetized game. No game development experience needed.
 
 **What you'll get:**
-1. A fully scaffolded game project with clean architecture
+1. A fully scaffolded game project with clean architecture (delta capping, object pooling, resource disposal)
 2. Pixel art sprites — recognizable characters, enemies, and items (optional, replaces geometric shapes)
-3. Visual polish — gradients, particles, transitions, juice
-4. A 50 FPS promo video — autonomous gameplay capture, mobile portrait, ready for social media
-5. Chiptune music and retro sound effects (no audio files needed)
-6. Live deployment to here.now with an instant public URL
-7. Monetization via Play.fun — points tracking, leaderboards, wallet connect, and a play.fun URL to share on Moltbook
-8. Redeploy with a single command (`npm run deploy`)
+3. Photorealistic 3D environments via World Labs Gaussian Splats (3D games, when `WLT_API_KEY` is set)
+4. Visual polish — gradients, particles, transitions, juice
+5. A 50 FPS promo video — autonomous gameplay capture, mobile portrait, ready for social media
+6. Chiptune music and retro sound effects (no audio files needed)
+7. A persistent Playwright test suite — run `npm test` after future changes
+8. Live deployment to here.now with an instant public URL
+9. Monetization via Play.fun — points tracking, leaderboards, wallet connect, and a play.fun URL to share on Moltbook
+10. A quality score and review report
+11. Redeploy with a single command (`npm run deploy`)
 
 **Quality assurance is built into every step** — each code-modifying step runs build verification, visual review via Playwright MCP, and autofixes any issues found.
 
@@ -53,19 +56,21 @@ Build a complete browser game from scratch, step by step. This command walks you
 - Step 1 (infrastructure only): Copy template, npm install, playwright install, start dev server
 - Verification protocol orchestration (launch QA subagent, read text result, launch autofix if needed)
 - Step 4 (deploy): Interactive auth requires user back-and-forth
+- Step 5.5 (review): Read-only analysis, no code changes
 
 **What goes to subagents** (via `Task` tool):
 - Step 1 (game implementation): Transform template into the actual game concept
-- Step 1.5: Pixel art sprites and backgrounds
+- Step 1.5: Pixel art sprites and backgrounds (2D) or World Labs environments + Meshy AI models (3D)
 - Step 2: Visual polish
 - Step 2.5: Promo video capture
 - Step 3: Audio integration
+- Step 3.5: QA test suite (Playwright)
 
 Each subagent receives: step instructions, relevant skill name, project path, engine type, dev server port, and game concept description.
 
 ## Verification Protocol
 
-Run after every code-modifying step (Steps 1, 1.5, 2, 3). Delegates all QA work to a subagent to minimize main-thread context usage.
+Run after every code-modifying step (Steps 1, 1.5, 2, 3). Step 3.5 runs its own test verification. Delegates all QA work to a subagent to minimize main-thread context usage.
 
 See [verification-protocol.md](verification-protocol.md) for full QA subagent instructions, orchestrator flow, and autofix logic.
 
@@ -79,6 +84,13 @@ Parse `$ARGUMENTS` to determine the game concept. Arguments can take two forms:
 - **Engine**: `2d` (Phaser — side-scrollers, platformers, arcade) or `3d` (Three.js — first-person, third-person, open world). If not specified, ask the user.
 - **Name**: The game name in kebab-case. If not specified, ask the user what kind of game they want and suggest a name.
 
+#### 3D API Keys
+
+For 3D games, check for these API keys in the environment:
+- **`MESHY_API_KEY`** — for generating custom 3D character/prop models with Meshy AI (see [tweet-pipeline.md](tweet-pipeline.md) for the prompt flow)
+- **`WLT_API_KEY`** — for generating photorealistic 3D environments with World Labs Gaussian Splats. If not set, ask the user alongside `MESHY_API_KEY`:
+  > I can also generate a **photorealistic 3D environment** with World Labs. Get a free API key at https://worldlabs.ai — or type "skip" to use basic geometry.
+
 #### Form B: Tweet URL as game concept
 
 See [tweet-pipeline.md](tweet-pipeline.md) for the full tweet fetching, parsing, creative abstraction, celebrity detection, and Meshy API key flow.
@@ -86,12 +98,13 @@ See [tweet-pipeline.md](tweet-pipeline.md) for the full tweet fetching, parsing,
 Create all pipeline tasks upfront using `TaskCreate`:
 
 1. Scaffold game from template
-2. Add assets: pixel art sprites (2D) or Meshy AI-generated GLB models + animated characters (3D)
+2. Add assets: pixel art sprites (2D) or World Labs environments + Meshy AI-generated GLB models + animated characters (3D)
 3. Add visual polish (particles, transitions, juice)
 4. Record promo video (autonomous 50 FPS capture)
 5. Add audio (BGM + SFX)
-6. Deploy to here.now
-7. Monetize with Play.fun (register on OpenGameProtocol, add SDK, redeploy)
+6. Add QA test suite (Playwright — gameplay, visual, perf)
+7. Deploy to here.now
+8. Monetize with Play.fun (register on OpenGameProtocol, add SDK, redeploy)
 
 This gives the user full visibility into pipeline progress at all times. Quality assurance (build, runtime, visual review, autofix) is built into each step, not a separate task.
 
@@ -157,13 +170,25 @@ Mark task 5 as `completed`.
 
 **Wait for user confirmation before proceeding.**
 
-### Step 4: Deploy to here.now
+### Step 3.5: Add QA test suite
 
 Mark task 6 as `in_progress`.
 
+See [step-details.md](step-details.md) for the full Step 3.5 subagent prompt template (Playwright install, test fixtures, game/visual/perf specs, npm scripts).
+
+**After subagent returns**, run `npm test` to verify all tests pass. Fix test code (not game code) if needed.
+
+Mark task 6 as `completed`.
+
+**Wait for user confirmation before proceeding.**
+
+### Step 4: Deploy to here.now
+
+Mark task 7 as `in_progress`.
+
 **This step stays in the main thread** because it may require user back-and-forth for API key setup.
 
-#### 6a. Check prerequisites
+#### 7a. Check prerequisites
 
 Verify the here-now skill is installed:
 
@@ -180,7 +205,7 @@ ls ~/.agents/skills/here-now/scripts/publish.sh
 
 **Wait for the user to confirm.**
 
-#### 6b. Build the game
+#### 7b. Build the game
 
 ```bash
 npm run build
@@ -188,7 +213,7 @@ npm run build
 
 Verify `dist/` exists and contains `index.html` and assets. If the build fails, fix the errors before proceeding.
 
-#### 6c. Verify the Vite base path
+#### 7c. Verify the Vite base path
 
 Read `vite.config.js`. For here.now, the `base` should be `'/'` (the default). If it's set to something else (e.g., a GitHub Pages subdirectory path), update it:
 
@@ -201,7 +226,7 @@ export default defineConfig({
 
 Rebuild after changing the base path.
 
-#### 6d. Publish to here.now
+#### 7d. Publish to here.now
 
 ```bash
 ~/.agents/skills/here-now/scripts/publish.sh dist/
@@ -217,11 +242,11 @@ Read and follow `publish_result.*` lines from script stderr. Save the slug for f
 > Visit your claim URL to create a free here.now account and keep your game online permanently.
 > The claim token is only shown once and cannot be recovered. Do this now before you forget!
 
-Then proceed to 6e to help them set up permanent hosting.
+Then proceed to 7e to help them set up permanent hosting.
 
-**If authenticated:** The publish is permanent. Skip 6e.
+**If authenticated:** The publish is permanent. Skip 7e.
 
-#### 6e. Set up permanent hosting
+#### 7e. Set up permanent hosting
 
 **This step is strongly recommended for anonymous publishes.** Help the user create a here.now account so their game stays online:
 
@@ -240,7 +265,7 @@ Then proceed to 6e to help them set up permanent hosting.
    ~/.agents/skills/here-now/scripts/publish.sh dist/ --slug <slug>
    ```
 
-#### 6f. Verify the deployment
+#### 7f. Verify the deployment
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" "https://<slug>.here.now/"
@@ -248,7 +273,7 @@ curl -s -o /dev/null -w "%{http_code}" "https://<slug>.here.now/"
 
 Should return 200 immediately (here.now deploys are instant).
 
-#### 6g. Add deploy script
+#### 7g. Add deploy script
 
 Add a `deploy` script to `package.json` so future deploys are one command:
 
@@ -289,17 +314,19 @@ Add a `deploy` script to `package.json` so future deploys are one command:
 >
 > **Next up: monetization.** I'll register your game on Play.fun (OpenGameProtocol), add the points SDK, and redeploy. Players earn rewards, you get a play.fun URL to share on Moltbook. Ready?
 
-Mark task 6 as `completed`.
+> For advanced deployment options (GitHub Pages, custom domains, troubleshooting), load the `game-deploy` skill.
+
+Mark task 7 as `completed`.
 
 **Wait for user confirmation before proceeding.**
 
 ### Step 5: Monetize with Play.fun
 
-Mark task 7 as `in_progress`.
+Mark task 8 as `in_progress`.
 
 **This step stays in the main thread** because it requires interactive authentication.
 
-#### 7a. Authenticate with Play.fun
+#### 8a. Authenticate with Play.fun
 
 Check if the user already has Play.fun credentials. The auth script is bundled with the plugin:
 
@@ -307,7 +334,7 @@ Check if the user already has Play.fun credentials. The auth script is bundled w
 node skills/playdotfun/scripts/playfun-auth.js status
 ```
 
-**If credentials exist**, skip to 7b.
+**If credentials exist**, skip to 8b.
 
 **If no credentials**, start the auth callback server:
 
@@ -328,7 +355,7 @@ Tell the user:
 
 If callback fails, offer manual method as fallback.
 
-#### 7b. Register the game on Play.fun
+#### 8b. Register the game on Play.fun
 
 Determine the deployed game URL from Step 6 (e.g., `https://<slug>.here.now/` or `https://<username>.github.io/<game-name>/`).
 
@@ -357,7 +384,7 @@ Use the Play.fun API to register the game. Load the `playdotfun` skill for API r
 
 Save the returned **game UUID**.
 
-#### 7c. Add the Play.fun Browser SDK
+#### 8c. Add the Play.fun Browser SDK
 
 First, extract the user's API key from stored credentials:
 
@@ -433,7 +460,7 @@ import { initPlayFun } from './playfun.js';
 initPlayFun().catch(err => console.warn('Play.fun init failed:', err));
 ```
 
-#### 7d. Rebuild and redeploy
+#### 8d. Rebuild and redeploy
 
 ```bash
 cd <project-dir> && npm run build && ~/.agents/skills/here-now/scripts/publish.sh dist/
@@ -443,7 +470,7 @@ If the project was deployed to GitHub Pages instead, use `npx gh-pages -d dist`.
 
 Verify the deployment is live (here.now deploys are instant; GitHub Pages may take 1-2 minutes).
 
-#### 7e. Tell the user
+#### 8e. Tell the user
 
 > Your game is monetized on Play.fun!
 >
@@ -455,7 +482,24 @@ Verify the deployment is live (here.now deploys are instant; GitHub Pages may ta
 >
 > **Share on Moltbook**: Post your game URL to [moltbook.com](https://www.moltbook.com/) — 770K+ agents ready to play and upvote.
 
-Mark task 7 as `completed`.
+Mark task 8 as `completed`.
+
+### Step 5.5: Code Review (informational)
+
+After monetization, run a final quality review. This is read-only — no code changes, no pipeline blocking.
+
+Load the `review-game` skill and run the full analysis against the project directory. Report the scores and any recommendations to the user:
+
+> **Quality Report:**
+> - Architecture: X/5
+> - Performance: X/5
+> - Code Quality: X/5
+> - Monetization Readiness: X/5
+>
+> **Recommendations** (if any):
+> - [list any issues found]
+>
+> These are suggestions for future improvement — your game is already live and monetized!
 
 ## Example Usage
 
@@ -476,14 +520,17 @@ Result: Fetches tweet → abstracts game concept → 3D Three.js scaffold → Me
 Tell the user:
 
 > Your game has been through the full pipeline! Here's what you have:
-> - **Scaffolded architecture** — clean, modular code structure
+> - **Scaffolded architecture** — clean, modular code with delta capping, object pooling, and resource disposal
 > - **Pixel art sprites** — recognizable characters (if chosen) or clean geometric shapes
+> - **3D environments** — photorealistic Gaussian Splat worlds (3D games with World Labs)
 > - **Visual polish** — gradients, particles, transitions, juice
 > - **Promo video** — 50 FPS gameplay footage in mobile portrait (`output/promo.mp4`)
 > - **Music and SFX** — chiptune background music and retro sound effects
+> - **Test suite** — run `npm test` for gameplay, visual regression, and performance checks
 > - **Quality assured** — each step verified with build, runtime, and visual review
 > - **Live on the web** — deployed to here.now with an instant public URL
 > - **Monetized on Play.fun** — points tracking, leaderboards, and wallet connect
+> - **Quality score** — architecture, performance, and code quality review
 >
 > **Share your play.fun URL on Moltbook** to reach 770K+ agents on the agent internet.
 > **Post your promo video** to TikTok, Reels, or X to drive traffic.
@@ -492,7 +539,9 @@ Tell the user:
 > - Add new gameplay features: `/game-creator:add-feature [describe what you want]`
 > - Upgrade to pixel art (if using shapes): `/game-creator:add-assets`
 > - Re-record promo video: `/game-creator:record-promo`
+> - Run a deeper code review: `/game-creator:review-game`
 > - Launch a playcoin for your game (token rewards for players)
 > - Keep iterating! Run any step again: `/game-creator:design-game`, `/game-creator:add-audio`
 > - Redeploy after changes: `npm run deploy`
+> - Run tests after changes: `npm test`
 > - Switch to GitHub Pages if you prefer git-based deploys: `/game-creator:game-deploy`

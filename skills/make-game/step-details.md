@@ -35,7 +35,7 @@ Launch a `Task` subagent with these instructions:
 > **Project path**: `<project-dir>`
 > **Engine**: `<2d|3d>`
 > **Game concept**: `<user's game description>`
-> **Skill to load**: `phaser` (2D) or `threejs-game` (3D)
+> **Skill to load**: `phaser` and `game-architecture` (2D) or `threejs-game` and `game-architecture` (3D)
 >
 > **Core loop first** — implement in this order:
 > 1. Input (touch + keyboard from the start — never keyboard-only)
@@ -340,6 +340,34 @@ Launch a `Task` subagent with these instructions:
 
 For 3D games, generate custom models with Meshy AI and integrate them as animated characters and world props. This is the 3D parallel of the 2D pixel art step above.
 
+**Pre-step: Environment Generation (World Labs — conditional)**
+
+If `WLT_API_KEY` is set in the environment, generate a photorealistic 3D environment BEFORE character/asset generation:
+
+1. **Ask the user for a reference image** (concept art, photo, screenshot). Image mode produces dramatically better results than text.
+2. **Generate the environment:**
+   ```bash
+   WLT_API_KEY=<key> node <plugin-root>/scripts/worldlabs-generate.mjs \
+     --mode image --image "<path-or-url>" \
+     --prompt "a <environment matching game concept>" \
+     --output <project-dir>/public/assets/environment/
+   # Or text-only if no image:
+   WLT_API_KEY=<key> node <plugin-root>/scripts/worldlabs-generate.mjs \
+     --mode text \
+     --prompt "a <detailed environment description matching game concept>" \
+     --output <project-dir>/public/assets/environment/
+   ```
+3. **Download outputs** — the script produces: SPZ (Gaussian Splat), collider mesh (GLB), panorama, thumbnail. Copy all to `public/assets/environment/`.
+4. **Record in `progress.md`:**
+   ```
+   ## 3D Environment
+   - Source: World Labs (image/text mode)
+   - Files: environment.spz, collider.glb
+   - Prompt: "<prompt used>"
+   ```
+
+If `WLT_API_KEY` is NOT set, skip environment generation silently — the 3D subagent will use basic geometry/primitives as before.
+
 **Pre-step: Character & Asset Generation**
 
 The Meshy API key should already be obtained in Step 0. If not set, ask now (see Step 0 instructions).
@@ -433,7 +461,19 @@ node <plugin-root>/scripts/find-3d-asset.mjs --query "<entity description>" \
 > **Engine**: 3D (Three.js)
 > **Skill to load**: `game-3d-assets` and `meshyai`
 >
-> **Read `progress.md`** at the project root before starting. It lists generated/downloaded models and the character details.
+> **Read `progress.md`** at the project root before starting. It lists generated/downloaded models, character details, and any World Labs environment.
+>
+> **If a World Labs environment was generated** (check `progress.md` for `## 3D Environment` and files in `public/assets/environment/`):
+> - Install SparkJS: `npm install @sparkjsdev/spark`
+> - Load the SPZ (Gaussian Splat) via `SplatMesh` from `@sparkjsdev/spark` — add to scene like any Three.js mesh
+> - **Y-flip required**: Apply `rotation.x = Math.PI` to BOTH the splat mesh and collider mesh (World Labs SPZ files are Y-inverted)
+> - Compensate Z position after flip: `position.z += (minZ + maxZ)` based on collider bounding box
+> - Load the collider mesh (GLB) as an invisible mesh for ground raycasting — characters walk on this
+> - Call `colliderMesh.updateMatrixWorld(true)` after setting rotation/position (raycasts fail before first render otherwise)
+> - Raycast UPWARD from Y=-50 with direction (0,1,0) to hit the floor after Y-flip
+> - Keep last known ground height as fallback when raycast misses (collider gaps)
+> - **Do NOT use the panorama** as `scene.background` — it causes a "world inside world" doubling effect. Use a solid color background instead.
+> - Use a single `renderer.render(scene, camera)` call — SparkJS handles splats within the standard render pipeline
 >
 > **Rigged character GLBs + animation GLBs are already in** `public/assets/models/`. Set up the character controller:
 >
@@ -685,8 +725,85 @@ Launch a `Task` subagent with these instructions:
 **Tell the user:**
 > Your game now has music and sound effects! Click/tap once to activate audio, then you'll hear the music.
 >
-> **Next up: deploy to the web.** I'll publish your game to here.now for an instant public URL. Ready?
+> **Next up: QA tests.** I'll add a persistent Playwright test suite so you can run `npm test` after future changes. Ready?
 
 Mark task 5 as `completed`.
+
+**Wait for user confirmation before proceeding.**
+
+---
+
+## Step 3.5: Add QA Test Suite
+
+Mark task 6 as `in_progress`.
+
+Launch a `Task` subagent with these instructions:
+
+> You are implementing Step 3.5 (QA Test Suite) of the game creation pipeline.
+>
+> **Project path**: `<project-dir>`
+> **Engine**: `<2d|3d>`
+> **Dev server port**: `<port>`
+> **Skill to load**: `game-qa`
+>
+> **Read `progress.md`** at the project root before starting. It describes the game's entities, events, constants, scoring system, and what previous steps have done.
+>
+> Apply the game-qa skill to create a persistent test suite:
+>
+> 1. **Install Playwright** (if not already installed): `npm install -D @playwright/test` + `npx playwright install chromium`
+> 2. **Create test fixtures** (`tests/fixtures/game-test.js`) — custom fixture that waits for game boot, provides `startPlaying()`, and exposes `render_game_to_text()`
+> 3. **Create test helpers** (`tests/helpers/seed-random.js`) — Mulberry32 seeded PRNG for deterministic tests
+> 4. **Create `tests/e2e/game.spec.js`** — core gameplay tests:
+>    - Game boots and shows canvas
+>    - Scenes load correctly
+>    - Player input works (test actual input keys from the game)
+>    - Scoring increments
+>    - Game over triggers
+>    - Restart resets state cleanly
+>    - `render_game_to_text()` returns valid JSON
+>    - `advanceTime(ms)` resolves correctly
+> 5. **Create `tests/e2e/visual.spec.js`** — visual regression tests:
+>    - Initial gameplay screenshot (use 3000 maxDiffPixels tolerance for animated content)
+>    - Game over state screenshot
+> 6. **Create `tests/e2e/perf.spec.js`** — performance benchmarks:
+>    - Load time < 5s
+>    - FPS > 5 (headless Chromium reports low FPS; threshold is intentionally low)
+>    - Canvas dimensions match Constants.js
+> 7. **Create `playwright.config.js`** with `webServer` pointing to `npm run dev` on the correct port
+> 8. **Add npm scripts** to `package.json`:
+>    ```json
+>    {
+>      "scripts": {
+>        "test": "npx playwright test",
+>        "test:headed": "npx playwright test --headed"
+>      }
+>    }
+>    ```
+> 9. **Run tests** to generate baseline screenshots and verify all pass
+> 10. **Fix any failing tests** — adjust selectors, timeouts, or thresholds as needed
+>
+> **After completing your work**, append a `## Step 3.5: QA Tests` section to `progress.md` with: test count, pass/fail results, baseline screenshots location.
+>
+> Do NOT modify game code — only add test infrastructure.
+
+**After subagent returns**, verify tests pass:
+
+```bash
+cd <project-dir> && npm test
+```
+
+If tests fail, fix test code (not game code) — adjust timeouts, selectors, or tolerances. The game was already verified in previous steps.
+
+**Tell the user:**
+> Your game now has a persistent test suite! Run `npm test` any time to verify everything works.
+>
+> **Tests added:**
+> - `tests/e2e/game.spec.js` — gameplay verification (boot, input, scoring, restart)
+> - `tests/e2e/visual.spec.js` — visual regression with baseline screenshots
+> - `tests/e2e/perf.spec.js` — load time, FPS, canvas dimensions
+>
+> **Next up: deploy to the web.** I'll publish your game to here.now for an instant public URL. Ready?
+
+Mark task 6 as `completed`.
 
 **Wait for user confirmation before proceeding.**

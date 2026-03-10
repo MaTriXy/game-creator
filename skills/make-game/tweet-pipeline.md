@@ -40,9 +40,11 @@ If celebrities are detected:
 - **2D**: The Step 1.5 subagent will use photo-composite characters for these
 - **3D**: For each celebrity, try: (1) generate with Meshy AI — `"a cartoon caricature of <Name>, <distinguishing features>, low poly game character"` then rig for animation, (2) check `3d-character-library/manifest.json` for a pre-built match, (3) search Sketchfab with `find-3d-asset.mjs`, (4) fall back to best-matching library model. Meshy generation produces the best results for named personalities since it can capture specific visual features.
 
-## Meshy API Key (3D games only)
+## API Keys (3D games only)
 
-If the engine is 3D, check if `MESHY_API_KEY` is set in the environment. If not, **ask the user immediately in Step 0** — don't wait until Step 1.5:
+If the engine is 3D, check for these API keys in the environment. If not set, **ask the user immediately in Step 0** — don't wait until Step 1.5:
+
+### Meshy API Key (character/prop models)
 
 > I'll generate custom 3D models with Meshy AI for the best results. You can get a free API key in 30 seconds:
 > 1. Sign up at https://app.meshy.ai
@@ -52,3 +54,10 @@ If the engine is 3D, check if `MESHY_API_KEY` is set in the environment. If not,
 > What is your Meshy API key? (Or type "skip" to use generic model libraries instead)
 
 Store the key for all subsequent `meshy-generate.mjs` calls throughout the pipeline.
+
+### World Labs API Key (photorealistic environments)
+
+> I can also generate a **photorealistic 3D environment** (Gaussian Splat) with World Labs.
+> Get a free API key at https://worldlabs.ai — or type "skip" to use basic geometry for the environment.
+
+Store the key for the World Labs environment generation in Step 1.5. If skipped, the 3D subagent uses basic geometry/primitives as before.
