@@ -3,6 +3,7 @@ name: promo-video
 description: >
   Record a high-FPS autonomous promo video of a Phaser game using Playwright.
   Triggers on: promo video, gameplay recording, marketing video, game capture.
+argument-hint: "[path-to-game]"
 license: MIT
 compatibility: Requires Playwright and FFmpeg installed locally for video capture and encoding.
 metadata:

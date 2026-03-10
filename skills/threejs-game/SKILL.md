@@ -1,6 +1,7 @@
 ---
 name: threejs-game
 description: Build 3D browser games with Three.js using event-driven modular architecture. Use when creating a new 3D game, adding 3D game features, setting up Three.js scenes, or working on any Three.js game project.
+argument-hint: "[topic]"
 license: MIT
 metadata:
   author: OpusGameLabs

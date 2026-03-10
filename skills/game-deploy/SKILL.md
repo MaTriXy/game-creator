@@ -1,6 +1,7 @@
 ---
 name: game-deploy
 description: Deploy browser games to here.now (default), GitHub Pages, or other hosting. Use when deploying a game, setting up hosting, or publishing a game build. Do NOT use for local development servers (use npm run dev).
+argument-hint: "[platform]"
 license: MIT
 compatibility: Requires internet access. Uses npx (here.now) or gh CLI (GitHub Pages) for deployment.
 metadata:

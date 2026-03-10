@@ -177,6 +177,24 @@ skills/phaser/
 
 **Skills with companion files:** `phaser` (8), `game-qa` (7), `game-audio` (6), `meshyai` (3), `game-assets` (3), `threejs-game` (3+), `make-game` (3).
 
+## Reference vs User-Invocable Skills
+
+Skills come in two flavors with a deliberate separation of concerns:
+
+- **User-invocable skills** (17) — Triggered by slash commands (e.g., `/add-audio`). These handle the full user-facing workflow: detect the game, load reference skills, run the pipeline, validate output. They have `argument-hint` in frontmatter.
+- **Reference skills** (10) — Deep domain knowledge loaded by other skills (or directly via `/load`). They contain patterns, code examples, and conventions but don't drive a workflow themselves.
+
+Four domains have both a reference and a user-invocable skill:
+
+| Reference Skill | User-Invocable Skill | Why Both Exist |
+|-----------------|---------------------|----------------|
+| `game-audio` | `add-audio` | `game-audio` has Web Audio API patterns reused by `add-audio` AND `make-game` step 3 |
+| `game-qa` | `qa-game` | `game-qa` has Playwright patterns reused by `qa-game` AND the QA subagent in `make-game` |
+| `game-assets` | `add-assets` | `game-assets` has pixel art patterns reused by `add-assets` AND `make-game` step 1.5 |
+| `game-designer` | `design-game` | `game-designer` has visual polish patterns reused by `design-game` AND `make-game` step 2 |
+
+This separation avoids duplicating domain knowledge across multiple skills. The reference skill is the single source of truth; the user-invocable skill orchestrates the workflow and loads the reference skill for domain knowledge.
+
 ## Common Tasks
 
 **Add a new skill**: Create `skills/<name>/SKILL.md`. Follow existing skill format with tech stack, architecture, code examples, and checklist. For skills >300 lines, extract detailed code examples and reference material into companion files.
@@ -241,3 +259,18 @@ The `/monetize-game` command (and Step 5 of `/make-game`) registers games on [Pl
 **SDK**: CDN script (`https://sdk.play.fun/latest`) + `src/playfun.js` that wires EventBus events (score changes, game over) to Play.fun points tracking. Non-blocking — if SDK fails to load, game still works.
 
 **Anti-cheat**: Games are registered with `maxScorePerSession`, `maxSessionsPerDay`, and `maxCumulativePointsPerDay` based on the game's scoring system.
+
+## Troubleshooting
+
+See `docs/troubleshooting.md` for common issues including:
+- Skill triggering (wrong skill loads, skill doesn't trigger, negative tests)
+- Build failures (module not found, port conflicts, empty dist)
+- Playwright/QA (browser not found, low FPS in headless, visual regression tolerance)
+- Deployment (here.now failures, anonymous expiry, GitHub Pages blank page)
+- Play.fun (auth failures, SDK not loading, anti-cheat rejections)
+- 3D assets (T-pose, wrong facing, Meshy timeouts)
+- Audio (autoplay policy, frequency issues)
+
+## Trigger Test Suite
+
+See `tests/trigger-tests.md` for manual test prompts (5-7 per skill) verifying correct trigger behavior. Covers all 17 user-invocable skills plus negative tests for prompts that should NOT trigger any skill.

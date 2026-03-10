@@ -1,12 +1,13 @@
 ---
 name: meshyai
 description: Generate custom 3D models from text or images using Meshy AI, then auto-rig and animate them for Three.js games. The preferred source for all 3D game assets. Use when the user says "generate a 3D model", "create a character model", "use Meshy", or needs a custom GLB model that doesn't exist in free libraries.
+argument-hint: "[text-prompt or image-path]"
 license: MIT
+compatibility: Requires MESHY_API_KEY environment variable and internet access for Meshy AI API calls.
 metadata:
   author: OpusGameLabs
   version: 1.3.0
   tags: [game, 3d, meshy, ai, model-generation, rigging, animation]
-compatibility: Requires MESHY_API_KEY environment variable and internet access for Meshy AI API calls.
 ---
 
 # Meshy AI — 3D Model Generation, Rigging & Animation
