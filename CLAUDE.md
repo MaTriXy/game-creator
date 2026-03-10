@@ -151,9 +151,35 @@ BGM uses a Web Audio API step sequencer. SFX use one-shot OscillatorNodes. All a
 
 Audio uses the built-in Web Audio API (zero dependencies). Strudel.cc (`@strudel/web`, AGPL-3.0) is available as an optional upgrade for richer BGM — see the game-audio skill.
 
+## Skill Companion Files Convention
+
+Skills use **progressive disclosure** via flat companion `.md` files alongside `SKILL.md`. This keeps `SKILL.md` concise (core patterns, decision trees, checklists) while detailed reference material lives in companion files that agents load on demand.
+
+**Convention:**
+- Companion files live in the same directory as `SKILL.md` (e.g., `skills/phaser/conventions.md`)
+- Do NOT use a `references/` subdirectory — keep files flat
+- Each `SKILL.md` has a `## Reference Files` section near the top listing all companions with descriptions
+- In the body, reference extracted content with `See filename.md for [topic].`
+
+**Example (`skills/phaser/`):**
+```
+skills/phaser/
+  SKILL.md                    # Core patterns, process, checklist (~290 lines)
+  conventions.md              # Coding conventions and style rules
+  project-setup.md            # Vite config, responsive canvas, DPR handling
+  scenes-and-lifecycle.md     # Scene management, transitions, parallel scenes
+  game-objects.md             # Sprites, buttons, groups, physics
+  events-and-state.md         # EventBus patterns, GameState management
+  ui-patterns.md              # HUD, menus, score display
+  testing-patterns.md         # Playwright test setup and fixtures
+  performance.md              # Optimization tips, texture atlases, object pooling
+```
+
+**Skills with companion files:** `phaser` (8), `game-qa` (7), `game-audio` (6), `meshyai` (3), `game-assets` (3), `threejs-game` (3+), `make-game` (3).
+
 ## Common Tasks
 
-**Add a new skill**: Create `skills/<name>/SKILL.md`. Follow existing skill format with tech stack, architecture, code examples, and checklist.
+**Add a new skill**: Create `skills/<name>/SKILL.md`. Follow existing skill format with tech stack, architecture, code examples, and checklist. For skills >300 lines, extract detailed code examples and reference material into companion files.
 
 **Add a new user-invocable skill** (slash command): Create `skills/<name>/SKILL.md` with YAML frontmatter (`name`, `description`, `argument-hint`). Body contains the prompt instructions.
 
