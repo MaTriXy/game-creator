@@ -1,7 +1,13 @@
 ---
 name: worldlabs
-description: Generate 3D worlds/environments with World Labs Marble API — photorealistic Gaussian Splat scenes from text or images
-argument-hint: "<prompt or 'image path/url'>"
+description: Generate photorealistic 3D worlds and environments with the World Labs Marble API — Gaussian Splat scenes from text prompts or reference images. Use when the user says "generate a 3D world", "create an environment", "make a 3D scene", or "use World Labs". Requires WLT_API_KEY environment variable.
+argument-hint: "[prompt or 'image path/url']"
+license: MIT
+compatibility: Requires WLT_API_KEY environment variable and internet access for World Labs API calls.
+metadata:
+  author: OpusGameLabs
+  version: 1.3.0
+  tags: [game, 3d, worldlabs, environment, gaussian-splat, generation]
 ---
 
 # World Labs — 3D World/Environment Generation

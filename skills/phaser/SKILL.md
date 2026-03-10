@@ -5,6 +5,11 @@ description: >
   Use when creating a new 2D game, adding 2D game features, working with Phaser, or building
   sprite-based web games.
 argument-hint: [topic or question]
+license: MIT
+metadata:
+  author: OpusGameLabs
+  version: 1.3.0
+  tags: [game, 2d, phaser, scenes, sprites, arcade-physics]
 ---
 
 # Phaser 3 Game Development

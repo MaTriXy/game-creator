@@ -1,6 +1,11 @@
 ---
 name: game-audio
 description: Game audio engineer using Web Audio API for procedural music and sound effects in browser games. Zero dependencies. Use when adding music or SFX to a game.
+license: MIT
+metadata:
+  author: OpusGameLabs
+  version: 1.3.0
+  tags: [game, audio, music, sfx, web-audio-api, bgm]
 ---
 
 # Game Audio Engineer (Web Audio API)

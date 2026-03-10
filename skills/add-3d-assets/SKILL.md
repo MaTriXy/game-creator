@@ -1,12 +1,19 @@
 ---
 name: add-3d-assets
-description: Replace primitive 3D shapes with real GLB models — animated characters, world props, buildings, and scenery for Three.js games. Use when the user says "add 3D models", "replace the boxes with real models", "add GLB assets", or "make the 3D game look real". For 2D pixel art, use add-assets instead.
+description: Replace primitive 3D shapes with real GLB models — animated characters, world props, buildings, and scenery for Three.js games. Use when the user says "add 3D models", "replace the boxes with real models", "add GLB assets", or "make the 3D game look real". For 2D pixel art, use add-assets instead. Do NOT use for 2D pixel art (use add-assets) or gameplay changes (use add-feature).
 argument-hint: "[path-to-game]"
+license: MIT
 metadata:
   author: OpusGameLabs
   version: 1.3.0
   tags: [game, 3d, assets, glb, models, threejs]
 ---
+
+## Performance Notes
+
+- Take your time to do this thoroughly
+- Quality is more important than speed
+- Do not skip validation steps
 
 # Add 3D Assets
 
@@ -125,6 +132,20 @@ node <plugin-root>/scripts/find-3d-asset.mjs --query "barrel" --source polyhaven
 - Adjust `MODEL_CONFIG` values (scale, rotationY, offsetY) per model
 - Run `npm run build` to confirm no errors
 - Generate `ATTRIBUTION.md` from `.meta.json` files
+
+## Example Usage
+
+### With Meshy AI
+```
+/add-3d-assets examples/space-explorer
+```
+Result: Generates custom knight model via Meshy → rigs and animates (Idle/Walk/Run) → replaces BoxGeometry player with animated GLB → adds OrbitControls camera → world props from free libraries.
+
+### Without Meshy (fallback)
+```
+/add-3d-assets examples/3d-platformer
+```
+Result: Copies Soldier.glb from character library → configures SkeletonUtils.clone() → fadeToAction animation crossfade → replaces all primitives with library/downloaded models.
 
 ## Troubleshooting
 

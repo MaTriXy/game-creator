@@ -1,6 +1,12 @@
 ---
 name: game-deploy
-description: Deploy browser games to here.now (default), GitHub Pages, or other hosting. Use when deploying a game, setting up hosting, or publishing a game build.
+description: Deploy browser games to here.now (default), GitHub Pages, or other hosting. Use when deploying a game, setting up hosting, or publishing a game build. Do NOT use for local development servers (use npm run dev).
+license: MIT
+compatibility: Requires internet access. Uses npx (here.now) or gh CLI (GitHub Pages) for deployment.
+metadata:
+  author: OpusGameLabs
+  version: 1.3.0
+  tags: [game, deploy, hosting, here-now, github-pages]
 ---
 
 # Game Deployment
@@ -169,6 +175,20 @@ await client.games.register({
 - **Netlify**: Connect repo, set build command to `npm run build`, publish dir to `dist`
 - **Railway**: Use the Railway skill for deployment
 - **itch.io**: Upload the `dist/` folder as an HTML5 game
+
+## Example Usage
+
+### Default (here.now)
+```
+/game-deploy
+```
+Result: Builds `dist/` → publishes via here.now → game live at `https://<slug>.here.now/` in seconds. Adds `npm run deploy` script for future one-command deploys.
+
+### GitHub Pages
+```
+/game-deploy github-pages
+```
+Result: Builds with correct base path → pushes to `gh-pages` branch → game live at `https://<user>.github.io/<game>/` in 1-2 minutes.
 
 ## Troubleshooting
 

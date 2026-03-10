@@ -2,6 +2,7 @@
 name: make-game
 description: Full guided pipeline — scaffold, design, audio, deploy, and monetize a browser game from scratch. Use when the user says "make a game", "build me a game", "create a new game", "make a 2D/3D game", or provides a game concept to build. Do NOT use for modifying existing games (use add-feature or improve-game instead).
 argument-hint: "[2d|3d] [game-name] OR [tweet-url]"
+license: MIT
 metadata:
   author: OpusGameLabs
   version: 1.3.0
@@ -455,6 +456,20 @@ Verify the deployment is live (here.now deploys are instant; GitHub Pages may ta
 > **Share on Moltbook**: Post your game URL to [moltbook.com](https://www.moltbook.com/) — 770K+ agents ready to play and upvote.
 
 Mark task 7 as `completed`.
+
+## Example Usage
+
+### 2D game from prompt
+```
+/make-game 2d flappy-cat
+```
+Result: Scaffold → pixel art cat + pipe sprites → sky gradient + particles → chiptune BGM + meow SFX → promo video → deploy to here.now → register on Play.fun. ~10 minutes, playable at `https://flappy-cat.here.now/`.
+
+### 3D game from tweet
+```
+/make-game https://x.com/user/status/123456
+```
+Result: Fetches tweet → abstracts game concept → 3D Three.js scaffold → Meshy AI character models → visual polish → audio → deploy + monetize.
 
 ### Pipeline Complete!
 

@@ -2,11 +2,13 @@
 name: monetize-game
 description: Register your game on Play.fun (OpenGameProtocol), add the browser SDK, and get a monetized play.fun URL. Use when the user says "monetize my game", "add Play.fun", "add rewards", "register on Play.fun", or "get a play.fun URL". Requires Play.fun MCP server for game registration.
 argument-hint: "[game-path]"
+license: MIT
 metadata:
   author: OpusGameLabs
   version: 1.3.0
   mcp-server: play-fun
   tags: [game, monetize, playfun, rewards, sdk]
+compatibility: Requires Play.fun MCP server (play-fun), Node.js, and internet access for auth and deployment.
 ---
 
 # Monetize Game (Play.fun / OpenGameProtocol)
@@ -300,6 +302,13 @@ curl -s -o /dev/null -w "%{http_code}" "$GAME_URL"
 > - Launch a playcoin for your game (token rewards for players)
 > - Check your leaderboard on Play.fun
 > - Share the play.fun URL on social media
+
+## Example Usage
+
+```
+/monetize-game examples/flappy-bird
+```
+Result: Auth with Play.fun → registers game with anti-cheat limits (maxScorePerSession: 1000) → adds SDK to index.html + creates `src/playfun.js` → wires score events to `addPoints()`, game-over to `savePoints()` → rebuilds → redeploys → live at `https://play.fun/games/<uuid>`. Points widget visible in-game.
 
 ## Troubleshooting
 

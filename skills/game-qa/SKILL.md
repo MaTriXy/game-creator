@@ -1,10 +1,12 @@
 ---
 name: game-qa
 description: Game QA testing with Playwright — visual regression, gameplay verification, performance, and accessibility for browser games. Use when writing or running game tests, debugging test failures, or building QA infrastructure. This is the reference skill — use qa-game for the user-facing command.
+license: MIT
 metadata:
   author: OpusGameLabs
   version: 1.3.0
   tags: [game, qa, testing, playwright]
+compatibility: Requires Node.js and Playwright for browser-based game testing.
 ---
 
 # Game QA with Playwright
