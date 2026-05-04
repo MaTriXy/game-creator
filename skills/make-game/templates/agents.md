@@ -13,6 +13,10 @@ This project follows the [`make-game`](https://github.com/OpusGameLabs/game-crea
 - **Language:** <e.g. TypeScript, C#>
 - **Target platform:** <e.g. Browser (desktop + mobile web)>
 
+## Hard gate: no code before plan
+
+If `docs/gameplan.md` does not exist in this repo, you are in the **idea phase** — do **not** create source files, run engine scaffolders, or install dependencies. Your only job is to walk the user through the idea-phase clarifying-questions checklist (gameplay loop, art style, controls/scope, engine/stack — see `make-game` skill `phase-pipelines/idea.md`) and produce `docs/gameplan.md`, `docs/tech.md`, and `docs/architectural-decisions/0001-engine-and-stack.md`. A detailed-sounding initial prompt is **not** a substitute for the checklist; ask every item even if the user "seems clear."
+
 ## Mandatory: run the make-game skill
 
 Every session in this directory **must** run the `make-game` skill's session-start sub-pipeline before any other work. The skill enforces phase awareness, doc continuity, milestone discipline, and the live-iterate verification loop.
